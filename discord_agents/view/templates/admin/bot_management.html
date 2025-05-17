@@ -1,0 +1,103 @@
+{% extends 'admin/base.html' %}
+
+{% block body %}
+<div class="container">
+    <!-- 測試資訊 -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h4>Debug Information:</h4>
+                <p>Template loaded successfully!</p>
+                <p>Registered Bots Count: {{ registered_bots|length }}</p>
+                <p>Running Bots Count: {{ running_bots|length }}</p>
+                <p>Registered Bots: {{ registered_bots }}</p>
+                <p>Running Bots: {{ running_bots }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Bot Management</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <a href="{{ url_for('botmanagementview.start_all_bots') }}" class="btn btn-success">
+                                <i class="fa fa-play"></i> Start All Bots
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Registered Bots</h3>
+                </div>
+                <div class="panel-body">
+                    {% if registered_bots %}
+                    <div class="list-group">
+                        {% for bot_id in registered_bots %}
+                        <div class="list-group-item">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h4 class="list-group-item-heading">{{ bot_id }}</h4>
+                                </div>
+                                <div class="col-md-4 text-right">
+                                    <a href="{{ url_for('botmanagementview.start_bot', bot_id=bot_id) }}"
+                                        class="btn btn-success btn-sm">
+                                        <i class="fa fa-play"></i> Start
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle"></i> No bots registered. Please add bots in the Bot configuration
+                        page.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Running Bots</h3>
+                </div>
+                <div class="panel-body">
+                    {% if running_bots %}
+                    <div class="list-group">
+                        {% for bot_id in running_bots %}
+                        <div class="list-group-item">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h4 class="list-group-item-heading">{{ bot_id }}</h4>
+                                </div>
+                                <div class="col-md-4 text-right">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle"></i> No bots are currently running.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
