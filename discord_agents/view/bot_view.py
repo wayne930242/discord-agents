@@ -1,13 +1,21 @@
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import Admin
 from discord_agents.domain.models import db, Bot, Agent
-from flask import Flask
+from flask import Flask, current_app
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectMultipleField
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, ValidationError
 import json
 from .runner_view import BotManagementView
 from discord_agents.domain.tools import Tools
+from discord_agents.utils.logger import logger
+
+
+def validate_json(form, field):
+    try:
+        json.loads(field.data)
+    except json.JSONDecodeError as e:
+        raise ValidationError(f'Invalid JSON format: {str(e)}')
 
 
 class BotAgentForm(FlaskForm):
@@ -15,9 +23,9 @@ class BotAgentForm(FlaskForm):
     token = StringField("Bot Token", validators=[DataRequired()])
     error_message = TextAreaField("Error Message", validators=[DataRequired()])
     command_prefix = StringField("Command Prefix", default="!")
-    dm_whitelist = TextAreaField("DM Whitelist", default="[]")
-    srv_whitelist = TextAreaField("Server Whitelist", default="[]")
-    use_function_map = TextAreaField("Function Map", default="{}")
+    dm_whitelist = TextAreaField("DM Whitelist", default="[]", validators=[validate_json])
+    srv_whitelist = TextAreaField("Server Whitelist", default="[]", validators=[validate_json])
+    use_function_map = TextAreaField("Function Map", default="{}", validators=[validate_json])
 
     # Agent fields
     name = StringField("Agent Name", validators=[DataRequired()])
@@ -83,6 +91,16 @@ class BotAgentView(ModelView):
             model.agent.tool_instructions = form.tool_instructions.data
             model.agent.agent_model = form.agent_model.data
             model.agent.tools = form.tools.data
+
+        try:
+            bot_id = f"bot_{model.id}"
+            bot_runner = current_app.bot_runner
+            
+            bot_runner._bots[bot_id] = model.to_bot()
+            logger.info(f"Bot {bot_id} settings have been updated successfully")
+        except Exception as e:
+            logger.error(f"Failed to update bot {bot_id} settings: {str(e)}", exc_info=True)
+            raise
 
     def on_form_prefill(self, form: FlaskForm, id: int) -> None:
         bot = self.session.query(Bot).get(id)
