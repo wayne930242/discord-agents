@@ -70,6 +70,7 @@ async def stream_agent_responses(
             return
 
         event_yielded_content = False
+        full_response_text = ""
 
         try:
             async for event in runner.run_async(
@@ -80,51 +81,26 @@ async def stream_agent_responses(
                         logger.warning("Received null event")
                         continue
 
-                    if hasattr(event, "content") and event.content:
-                        if event.content.parts:
-                            for part in event.content.parts:
-                                try:
-                                    message_to_yield = None
+                    if event.partial and event.content and event.content.parts and event.content.parts[0].text:
+                        full_response_text += event.content.parts[0].text
+                        continue
 
-                                    if part.text:
-                                        message_to_yield = part.text
-                                        logger.info(
-                                            f'<<< Agent text part (yielding): "{message_to_yield[:100]}..."'
-                                        )
-
-                                    elif (
-                                        hasattr(part, "function_call")
-                                        and part.function_call
-                                    ):
-                                        func_name = part.function_call.name
-                                        if (
-                                            use_function_map
-                                            and func_name in use_function_map
-                                        ):
-                                            message_to_yield = (
-                                                "（"
-                                                + use_function_map[func_name]
-                                                + "）"
-                                            )
-                                            logger.info(
-                                                f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
-                                            )
-                                        else:
-                                            message_to_yield = f"（......）"
-                                            logger.warning(
-                                                f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
-                                            )
-
-                                    if message_to_yield:
-                                        yield message_to_yield
-                                        event_yielded_content = True
-
-                                except Exception as part_error:
-                                    logger.error(
-                                        f"Error processing part: {str(part_error)}",
-                                        exc_info=True,
-                                    )
-                                    continue
+                    if event.get_function_calls():
+                        for call in event.get_function_calls():
+                            func_name = call.name
+                            if use_function_map and func_name in use_function_map:
+                                message_to_yield = "（" + use_function_map[func_name] + "）"
+                                logger.info(
+                                    f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
+                                )
+                                yield message_to_yield
+                                event_yielded_content = True
+                            else:
+                                logger.warning(
+                                    f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
+                                )
+                                yield "（......）"
+                                event_yielded_content = True
 
                     if event.is_final_response():
                         logger.info(
@@ -140,6 +116,21 @@ async def stream_agent_responses(
                             escalation_message = f"⚠️ *Agent escalated*: {event.error_message or 'No specific message.'}"
                             logger.info(f"<<< Agent escalated: {escalation_message}")
                             yield escalation_message
+                            return
+
+                        if event.content and event.content.parts:
+                            for part in event.content.parts:
+                                if part.text:
+                                    final_text = full_response_text + (part.text if not event.partial else "")
+                                    if final_text.strip():
+                                        yield final_text.strip()
+                                        event_yielded_content = True
+                                        full_response_text = ""
+                                elif hasattr(part, "function_response"):
+                                    response_data = part.function_response.response
+                                    if isinstance(response_data, dict):
+                                        yield str(response_data)
+                                        event_yielded_content = True
 
                         if not event_yielded_content:
                             logger.warning("<<< Final event did not yield content")
