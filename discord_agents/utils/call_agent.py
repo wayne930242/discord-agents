@@ -53,8 +53,10 @@ async def stream_agent_responses(
     use_function_map: Union[dict[str, str], None] = None,
 ) -> AsyncGenerator[str, None]:
     try:
-        logger.info(f"\n>>> User Query for user {user_id}, session {session_id}: {query}")
-        
+        logger.info(
+            f"\n>>> User Query for user {user_id}, session {session_id}: {query}"
+        )
+
         if not query or not user_id or not session_id:
             logger.error("Invalid input parameters")
             yield "⚠️ Invalid input parameters"
@@ -71,9 +73,7 @@ async def stream_agent_responses(
 
         try:
             async for event in runner.run_async(
-                user_id=user_id,
-                session_id=session_id,
-                new_message=user_content
+                user_id=user_id, session_id=session_id, new_message=user_content
             ):
                 try:
                     if not event:
@@ -92,15 +92,25 @@ async def stream_agent_responses(
                                             f'<<< Agent text part (yielding): "{message_to_yield[:100]}..."'
                                         )
 
-                                    elif hasattr(part, "function_call") and part.function_call:
+                                    elif (
+                                        hasattr(part, "function_call")
+                                        and part.function_call
+                                    ):
                                         func_name = part.function_call.name
-                                        if use_function_map and func_name in use_function_map:
-                                            message_to_yield = "（" + use_function_map[func_name] + "）"
+                                        if (
+                                            use_function_map
+                                            and func_name in use_function_map
+                                        ):
+                                            message_to_yield = (
+                                                "（"
+                                                + use_function_map[func_name]
+                                                + "）"
+                                            )
                                             logger.info(
                                                 f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
                                             )
                                         else:
-                                            message_to_yield = f"⚠️ [Unknown FunctionCall]: {func_name}"
+                                            message_to_yield = f"（......）"
                                             logger.warning(
                                                 f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
                                             )
@@ -110,11 +120,16 @@ async def stream_agent_responses(
                                         event_yielded_content = True
 
                                 except Exception as part_error:
-                                    logger.error(f"Error processing part: {str(part_error)}", exc_info=True)
+                                    logger.error(
+                                        f"Error processing part: {str(part_error)}",
+                                        exc_info=True,
+                                    )
                                     continue
 
                     if event.is_final_response():
-                        logger.info(f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})")
+                        logger.info(
+                            f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})"
+                        )
 
                         if (
                             hasattr(event, "actions")
@@ -133,13 +148,19 @@ async def stream_agent_responses(
                         return
 
                 except Exception as event_error:
-                    logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+                    logger.error(
+                        f"Error processing event: {str(event_error)}", exc_info=True
+                    )
                     continue
 
         except Exception as stream_error:
-            logger.error(f"Error in stream processing: {str(stream_error)}", exc_info=True)
+            logger.error(
+                f"Error in stream processing: {str(stream_error)}", exc_info=True
+            )
             yield "⚠️ Error processing response, please try again later."
 
     except Exception as e:
-        logger.error(f"Unexpected error in stream_agent_responses: {str(e)}", exc_info=True)
+        logger.error(
+            f"Unexpected error in stream_agent_responses: {str(e)}", exc_info=True
+        )
         yield "⚠️ Unexpected error, please try again later."
