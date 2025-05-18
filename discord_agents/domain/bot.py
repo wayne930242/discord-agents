@@ -150,13 +150,13 @@ class MyBot:
                 logger.error(
                     f"Error processing command: {str(cmd_error)}", exc_info=True
                 )
-                await message.channel.send("處理命令時發生錯誤，請稍後再試。")
+                await message.channel.send("Error processing command, please try again later.")
 
         except Exception as e:
             logger.error(f"Error in message handler: {str(e)}", exc_info=True)
             try:
                 if message.channel:
-                    await message.channel.send("處理訊息時發生錯誤，請稍後再試。")
+                    await message.channel.send("Error processing message, please try again later.")
             except Exception as send_error:
                 logger.error(
                     f"Error sending error message: {str(send_error)}", exc_info=True
@@ -173,7 +173,6 @@ class MyBot:
 
     async def close_bot_session(self) -> None:
         try:
-            logger.info("Bot close functionality temporarily disabled")
             return
         except Exception as e:
             logger.error(f"Error in close_bot_session: {str(e)}", exc_info=True)

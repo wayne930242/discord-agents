@@ -1,5 +1,14 @@
 from google.adk.agents import Agent
 from google.adk.tools.base_tool import BaseTool
+from datetime import datetime
+import pytz
+
+timezone = pytz.timezone("Asia/Taipei")
+current_time = datetime.now(timezone)
+
+time_instructions = (
+    f"The current time is {current_time.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Taipei)."
+)
 
 
 class MyAgent:
@@ -16,7 +25,7 @@ class MyAgent:
     ):
         self.name = name
         self.description = description
-        self.instructions = f"{role_instructions}\n\n{tool_instructions}"
+        self.instructions = f"{role_instructions}\n\n{tool_instructions}\n\n{time_instructions}"
         self.agent_model = agent_model
         self.tools = tools or []
 

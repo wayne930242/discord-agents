@@ -1,8 +1,6 @@
 from typing import Dict, Optional
 import asyncio
 import threading
-from flask import Flask
-import time
 
 from discord_agents.domain.bot import MyBot
 from discord_agents.utils.logger import logger
@@ -73,7 +71,12 @@ class BotRunner:
             raise
 
     def stop_bot(self, bot_id: str) -> None:
-        logger.info(f"Stop functionality temporarily disabled for bot {bot_id}")
+        bot = self._bots[bot_id]
+        if bot.is_running():
+            bot.close_bot_session()
+            logger.info(f"Bot {bot_id} stopped successfully")
+        else:
+            logger.warning(f"Bot {bot_id} is not running")
         return
 
     def start_all_bots(self) -> None:
@@ -95,7 +98,8 @@ class BotRunner:
         logger.info("Finished attempt to start all bots.")
 
     def stop_all_bots(self) -> None:
-        logger.info("Stop functionality temporarily disabled for all bots")
+        for bot_id in list(self._running_tasks.keys()):
+            self.stop_bot(bot_id)
         return
 
     def get_bot(self, bot_id: str) -> Optional[MyBot]:
