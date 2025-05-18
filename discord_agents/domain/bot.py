@@ -3,7 +3,6 @@ from discord.ext import commands
 import discord
 from typing import Optional, List, Dict
 import re
-import asyncio
 
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.env import DATABASE_URL, DM_ID_WHITE_LIST, SERVER_ID_WHITE_LIST

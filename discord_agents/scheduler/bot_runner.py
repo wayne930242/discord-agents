@@ -1,7 +1,6 @@
 from typing import Dict, Optional
 import asyncio
 import threading
-import time
 
 from discord_agents.domain.bot import MyBot
 from discord_agents.utils.logger import get_logger

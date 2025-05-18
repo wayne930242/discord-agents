@@ -116,7 +116,7 @@ async def stream_agent_responses(
                                 yield "（......）"
                                 event_yielded_content = True
 
-                    if event.content and event.content.parts:
+                    if event.content and event.content.parts and not event.partial:
                         for part in event.content.parts:
                             if part.text:
                                 yield part.text
@@ -138,7 +138,7 @@ async def stream_agent_responses(
                             yield escalation_message
                             return
 
-                        if event.content and event.content.parts:
+                        if not event_yielded_content and event.content and event.content.parts:
                             for part in event.content.parts:
                                 if part.text:
                                     final_text = full_response_text + (part.text if not event.partial else "")
