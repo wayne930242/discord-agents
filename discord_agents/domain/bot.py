@@ -7,7 +7,9 @@ import asyncio
 
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.env import DATABASE_URL, DM_ID_WHITE_LIST, SERVER_ID_WHITE_LIST
-from discord_agents.utils.logger import logger
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("bot")
 
 
 class MyBot:
@@ -165,7 +167,6 @@ class MyBot:
     async def run(self) -> None:
         try:
             logger.info("Starting bot...")
-            self._bot._loop = asyncio.get_running_loop()
             await self._bot.start(self._token)
         except Exception as e:
             logger.error(f"Error running bot: {str(e)}", exc_info=True)
@@ -173,9 +174,11 @@ class MyBot:
 
     async def close_bot_session(self) -> None:
         try:
-            return
+            logger.info("Closing bot session...")
+            await self._bot.close()
+            logger.info("Bot session closed successfully.")
         except Exception as e:
-            logger.error(f"Error in close_bot_session: {str(e)}", exc_info=True)
+            logger.error(f"Error in close_bot_session: {e}", exc_info=True)
             raise
 
     def is_running(self) -> bool:

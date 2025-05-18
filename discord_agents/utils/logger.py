@@ -39,5 +39,3 @@ def get_logger(name: str) -> logging.Logger:
 
     return logger
 
-
-logger = get_logger(__name__)

@@ -1,9 +1,10 @@
-# env.py
 import os
 from dotenv import load_dotenv
 from typing import Any
 
-from discord_agents.utils.logger import logger
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("env")
 
 load_dotenv()
 

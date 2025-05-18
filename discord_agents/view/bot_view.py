@@ -8,7 +8,9 @@ from wtforms.validators import DataRequired, ValidationError
 import json
 from .runner_view import BotManagementView
 from discord_agents.domain.tools import Tools
-from discord_agents.utils.logger import logger
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("bot_view")
 
 
 def validate_json(form, field):

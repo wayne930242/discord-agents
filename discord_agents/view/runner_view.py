@@ -1,6 +1,9 @@
 from flask_admin import BaseView, expose
 from flask import flash, redirect, url_for, current_app
-from discord_agents.utils.logger import logger
+
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("runner_view")
 
 
 class BotManagementView(BaseView):
@@ -21,7 +24,9 @@ class BotManagementView(BaseView):
                     if bot_id in current_app.bot_runner.get_running_bots():
                         running_bots.append(bot_id)
                 except Exception as e:
-                    logger.error(f"Error checking bot {bot_id} status: {str(e)}", exc_info=True)
+                    logger.error(
+                        f"Error checking bot {bot_id} status: {str(e)}", exc_info=True
+                    )
             logger.info(f"Running bots: {running_bots}")
 
             return self.render(

@@ -1,9 +1,12 @@
 from typing import Dict, Optional
 import asyncio
 import threading
+import time
 
 from discord_agents.domain.bot import MyBot
-from discord_agents.utils.logger import logger
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("bot_runner")
 
 
 class BotRunner:
@@ -11,6 +14,8 @@ class BotRunner:
         self._bots: Dict[str, MyBot] = {}
         self._running_tasks: Dict[str, Dict] = {}
         self._stop_events: Dict[str, threading.Event] = {}
+        self._main_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._main_loop)
 
     def register_bot(self, bot_id: str, bot: MyBot) -> None:
         if bot_id in self._bots:
@@ -34,13 +39,9 @@ class BotRunner:
             logger.info(f"Create stop event for bot {bot_id}")
             stop_event = threading.Event()
 
-            logger.info(f"Create event loop for bot {bot_id}")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
             logger.info(f"Create thread for bot {bot_id}")
             thread = threading.Thread(
-                target=self._run_bot, args=(bot_id, loop, stop_event), daemon=True
+                target=self._run_bot, args=(bot_id, stop_event), daemon=True
             )
 
             if bot_id in self._running_tasks:
@@ -49,16 +50,12 @@ class BotRunner:
                 old_task["stop_event"].set()
                 if old_task["thread"].is_alive():
                     old_task["thread"].join(timeout=5.0)
-                if old_task["loop"].is_running():
-                    old_task["loop"].stop()
-                old_task["loop"].close()
 
             logger.info(f"Start thread for bot {bot_id} successfully")
             thread.start()
 
             self._running_tasks[bot_id] = {
                 "thread": thread,
-                "loop": loop,
                 "stop_event": stop_event,
                 "bot": self._bots[bot_id],
             }
@@ -71,13 +68,23 @@ class BotRunner:
             raise
 
     def stop_bot(self, bot_id: str) -> None:
-        bot = self._bots[bot_id]
-        if bot.is_running():
-            bot.close_bot_session()
-            logger.info(f"Bot {bot_id} stopped successfully")
-        else:
+        if bot_id not in self._running_tasks:
             logger.warning(f"Bot {bot_id} is not running")
-        return
+            return
+
+        task_info = self._running_tasks.pop(bot_id)
+        stop_event = task_info["stop_event"]
+        thread = task_info["thread"]
+
+        logger.info(f"Stopping bot {bot_id}...")
+        stop_event.set()
+        
+        try:
+            if thread.is_alive():
+                thread.join(timeout=5.0)
+            logger.info(f"Bot {bot_id} stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping bot {bot_id}: {str(e)}", exc_info=True)
 
     def start_all_bots(self) -> None:
         logger.info("Attempting to start all registered bots.")
@@ -136,19 +143,14 @@ class BotRunner:
     def get_registered_bots(self) -> Dict[str, MyBot]:
         return self._bots.copy()
 
-    def _run_bot(
-        self, bot_id: str, loop: asyncio.AbstractEventLoop, stop_event: threading.Event
-    ) -> None:
+    def _run_bot(self, bot_id: str, stop_event: threading.Event) -> None:
         logger.info(f"Start bot {bot_id} in thread")
         try:
             bot = self._bots[bot_id]
 
-            asyncio.set_event_loop(loop)
-
             async def run_bot():
                 try:
                     logger.info(f"Start running bot {bot_id}")
-                    bot._bot._loop = loop
                     await bot.run()
                 except Exception as e:
                     logger.error(f"Error in run_bot: {str(e)}", exc_info=True)
@@ -160,29 +162,32 @@ class BotRunner:
                     await asyncio.sleep(1)
                 logger.info(f"Bot {bot_id} received stop signal")
                 try:
-                    await bot.close()
+                    await bot.close_bot_session()
                 except Exception as e:
-                    logger.error(
-                        f"Error closing bot in check_stop: {str(e)}", exc_info=True
-                    )
+                    logger.error(f"Error closing bot in check_stop: {e}", exc_info=True)
 
             logger.info(f"Create stop check task for bot {bot_id}")
-            loop.create_task(check_stop())
+            self._main_loop.create_task(check_stop())
 
-            loop.run_until_complete(run_bot())
+            try:
+                self._main_loop.run_until_complete(run_bot())
+            except Exception as e:
+                logger.error(f"Error running bot {bot_id}: {str(e)}", exc_info=True)
+                if bot_id in self._running_tasks:
+                    del self._running_tasks[bot_id]
 
         except Exception as e:
             logger.error(f"Error running bot {bot_id}: {str(e)}", exc_info=True)
             if bot_id in self._running_tasks:
                 del self._running_tasks[bot_id]
         finally:
-            logger.info(f"Clean resources for bot {bot_id}")
-            try:
-                if loop.is_running():
-                    loop.stop()
-                loop.close()
-            except Exception as e:
-                logger.error(
-                    f"Error cleaning up loop for bot {bot_id}: {str(e)}", exc_info=True
-                )
             logger.info(f"Bot {bot_id} thread finished")
+
+    def __del__(self):
+        try:
+            if self._main_loop.is_running():
+                self._main_loop.stop()
+            if not self._main_loop.is_closed():
+                self._main_loop.close()
+        except Exception as e:
+            logger.error(f"Error cleaning up main loop: {str(e)}", exc_info=True)

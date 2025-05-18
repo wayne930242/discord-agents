@@ -10,8 +10,10 @@ from discord_agents.domain.models import db, Bot
 from discord_agents.view.bot_view import BotAgentView
 from discord_agents.view.runner_view import BotManagementView
 from discord_agents.env import DATABASE_URL
-from discord_agents.utils.logger import logger
 from discord_agents.env import ADMIN_PASSWORD, ADMIN_USERNAME
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("main")
 
 
 def check_auth(username, password):

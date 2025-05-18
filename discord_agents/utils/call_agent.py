@@ -2,7 +2,9 @@ from google.genai import types
 from google.adk.runners import Runner
 from typing import AsyncGenerator, Union
 
-from discord_agents.utils.logger import logger
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("call_agent")
 
 
 # NOTE: From official docs, do not remove any part of this function (including comments) for reference
@@ -77,6 +79,18 @@ async def stream_agent_responses(
                 user_id=user_id, session_id=session_id, new_message=user_content
             ):
                 try:
+
+                    logger.debug(f"Event details: {event}")
+                    logger.debug(f"Event type: {type(event).__name__}")
+                    
+                    if event.content and event.content.parts:
+                        for i, part in enumerate(event.content.parts):
+                            logger.debug(f"Part {i} details:")
+                            logger.debug(f"  Text: {part.text}")
+                            logger.debug(f"  Function call: {part.function_call}")
+                            logger.debug(f"  Function response: {part.function_response}")
+                            logger.debug(f"  Raw part: {part}")
+                    
                     if not event:
                         logger.warning("Received null event")
                         continue
@@ -100,6 +114,12 @@ async def stream_agent_responses(
                                     f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
                                 )
                                 yield "（......）"
+                                event_yielded_content = True
+
+                    if event.content and event.content.parts:
+                        for part in event.content.parts:
+                            if part.text:
+                                yield part.text
                                 event_yielded_content = True
 
                     if event.is_final_response():
