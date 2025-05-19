@@ -21,6 +21,8 @@ dependencies = [
     "langchain-community>=0.3.24",
     "flask-apscheduler>=1.13.1",
     "pytz>=2025.2",
+    "redis>=6.1.0",
+    "celery>=5.5.2",
 ]
 
 [build-system]

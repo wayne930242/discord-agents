@@ -8,6 +8,7 @@ logger = get_logger("env")
 
 load_dotenv()
 
+REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/agent_data.db")
 
 DM_ID_WHITE_LIST: list[str] = os.getenv("DM_ID_WHITE_LIST", "").split(",")
@@ -27,6 +28,7 @@ REQUIRED_ENV_VARS: dict[str, Any] = {
     "DATABASE_URL": DATABASE_URL,
     "GOOGLE_API_KEY": GOOGLE_API_KEY,
     "TAVILY_API_KEY": TAVILY_API_KEY,
+    "REDIS_URL": REDIS_URL,
 }
 
 missing_vars: list[str] = []

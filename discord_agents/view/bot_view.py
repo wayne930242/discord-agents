@@ -27,7 +27,7 @@ class BotAgentForm(FlaskForm):
     command_prefix = StringField("Command Prefix", default="!")
     dm_whitelist = TextAreaField("DM Whitelist", default="[]", validators=[validate_json])
     srv_whitelist = TextAreaField("Server Whitelist", default="[]", validators=[validate_json])
-    use_function_map = TextAreaField("Function Map", default="{}", validators=[validate_json])
+    use_function_map = TextAreaField("Function Map (deprecated)", default="{}", validators=[validate_json])
 
     # Agent fields
     name = StringField("Agent Name", validators=[DataRequired()])
