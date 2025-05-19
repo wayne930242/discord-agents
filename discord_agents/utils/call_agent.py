@@ -110,9 +110,6 @@ async def stream_agent_responses(
                                 if not only_final:
                                     yield message_to_yield
                             else:
-                                logger.warning(
-                                    f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
-                                )
                                 if not only_final:
                                     yield "（......）"
                     # Handle final event

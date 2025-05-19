@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 
 # ANSI escape sequences for colored log level names
 RESET = "\x1b[0m"
@@ -23,19 +24,26 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    log_fmt = '%(asctime)s - %(levelname)s - %(message)s (%(name)s)'
+    date_fmt = '%Y-%m-%d %H:%M:%S'
+
     if not logger.handlers:
+        # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.DEBUG)
-
-        fmt = '%(asctime)s - %(levelname)s - %(message)s (%(name)s)'
-        datefmt = '%Y-%m-%d %H:%M:%S'
         if console_handler.stream.isatty():
-            formatter = ColoredFormatter(fmt, datefmt=datefmt)
+            formatter = ColoredFormatter(log_fmt, datefmt=date_fmt)
         else:
-            formatter = logging.Formatter(fmt, datefmt=datefmt)
-
+            formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        file_handler = logging.FileHandler(os.path.join(log_dir, "discord_agents.log"), encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(log_fmt, datefmt=date_fmt))
+        logger.addHandler(file_handler)
 
     return logger
 
