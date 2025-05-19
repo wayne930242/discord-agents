@@ -1,10 +1,12 @@
 from google.adk.tools.agent_tool import AgentTool
 from discord_agents.domain.tool_def.search_tool import search_tool
+from discord_agents.domain.tool_def.life_env_tool import life_env_tool
 from typing import Optional
 
 
 TOOLS_DICT: dict[str, AgentTool] = {
     "search": search_tool,
+    "life_env": life_env_tool,
 }
 
 
