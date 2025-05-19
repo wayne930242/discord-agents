@@ -13,7 +13,7 @@ def dice_tool(dice_count: int, dice_sides: int):
 
 
 def create_life_env_agent():
-    dice_tool = FunctionTool(func=dice_tool)
+    dice_tool_fn = FunctionTool(func=dice_tool)
 
     life_env_agent = Agent(
         name="life_env_agent",
@@ -33,7 +33,7 @@ Based on the information provided by the AI agent, your job is to generate a sui
    - 00: Something extremely bad has happened.
 3. When determining the state based on the value, do not consider the agent's mood—they are not human. Provide the most dramatic and character-appropriate description possible.
 """,
-        tools=[dice_tool],
+        tools=[dice_tool_fn],
     )
 
     return life_env_agent
