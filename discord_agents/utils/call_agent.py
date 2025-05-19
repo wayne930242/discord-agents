@@ -53,6 +53,7 @@ async def stream_agent_responses(
     user_id: str,
     session_id: str,
     use_function_map: Union[dict[str, str], None] = None,
+    only_final: bool = True,
 ) -> AsyncGenerator[str, None]:
     try:
         logger.info(
@@ -71,18 +72,16 @@ async def stream_agent_responses(
             yield "⚠️ Error creating content"
             return
 
-        event_yielded_content = False
         full_response_text = ""
+        final_response_yielded = False
 
         try:
             async for event in runner.run_async(
                 user_id=user_id, session_id=session_id, new_message=user_content
             ):
                 try:
-
                     logger.debug(f"Event details: {event}")
                     logger.debug(f"Event type: {type(event).__name__}")
-                    
                     if event.content and event.content.parts:
                         for i, part in enumerate(event.content.parts):
                             logger.debug(f"Part {i} details:")
@@ -90,15 +89,16 @@ async def stream_agent_responses(
                             logger.debug(f"  Function call: {part.function_call}")
                             logger.debug(f"  Function response: {part.function_response}")
                             logger.debug(f"  Raw part: {part}")
-                    
                     if not event:
                         logger.warning("Received null event")
                         continue
-
+                    # Handle partial event
                     if event.partial and event.content and event.content.parts and event.content.parts[0].text:
                         full_response_text += event.content.parts[0].text
+                        if not only_final:
+                            yield event.content.parts[0].text
                         continue
-
+                    # Handle function call
                     if event.get_function_calls():
                         for call in event.get_function_calls():
                             func_name = call.name
@@ -107,26 +107,19 @@ async def stream_agent_responses(
                                 logger.info(
                                     f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
                                 )
-                                yield message_to_yield
-                                event_yielded_content = True
+                                if not only_final:
+                                    yield message_to_yield
                             else:
                                 logger.warning(
                                     f"⚠️ [Unhandled FunctionCall] {func_name} not in use_function_map"
                                 )
-                                yield "（......）"
-                                event_yielded_content = True
-
-                    if event.content and event.content.parts and not event.partial:
-                        for part in event.content.parts:
-                            if part.text:
-                                yield part.text
-                                event_yielded_content = True
-
-                    if event.is_final_response():
+                                if not only_final:
+                                    yield "（......）"
+                    # Handle final event
+                    if event.is_final_response() and not final_response_yielded:
                         logger.info(
                             f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})"
                         )
-
                         if (
                             hasattr(event, "actions")
                             and event.actions
@@ -134,42 +127,43 @@ async def stream_agent_responses(
                             and event.actions.escalate
                         ):
                             escalation_message = f"⚠️ *Agent escalated*: {event.error_message or 'No specific message.'}"
-                            logger.info(f"<<< Agent escalated: {escalation_message}")
-                            yield escalation_message
+                            if only_final:
+                                yield escalation_message
+                            else:
+                                yield escalation_message
+                            final_response_yielded = True
+                            full_response_text = ""
                             return
-
-                        if not event_yielded_content and event.content and event.content.parts:
-                            for part in event.content.parts:
-                                if part.text:
-                                    final_text = full_response_text + (part.text if not event.partial else "")
-                                    if final_text.strip():
-                                        yield final_text.strip()
-                                        event_yielded_content = True
-                                        full_response_text = ""
-                                elif hasattr(part, "function_response"):
-                                    response_data = part.function_response.response
-                                    if isinstance(response_data, dict):
-                                        yield str(response_data)
-                                        event_yielded_content = True
-
-                        if not event_yielded_content:
-                            logger.warning("<<< Final event did not yield content")
-                            yield "⚠️ No valid response received"
-
-                        return
-
+                        # Normal final response
+                        if event.content and event.content.parts:
+                            final_text = (full_response_text + event.content.parts[0].text).strip()
+                            yield final_text
+                            final_response_yielded = True
+                            full_response_text = ""
+                            return
+                        else:
+                            if only_final:
+                                yield "⚠️ No valid response received"
+                            else:
+                                yield "⚠️ No valid response received"
+                            final_response_yielded = True
+                            full_response_text = ""
+                            return
+                    # Non-final event full content
+                    if event.content and event.content.parts and not event.partial and not event.is_final_response():
+                        for part in event.content.parts:
+                            if part.text and not only_final:
+                                yield part.text
                 except Exception as event_error:
                     logger.error(
                         f"Error processing event: {str(event_error)}", exc_info=True
                     )
                     continue
-
         except Exception as stream_error:
             logger.error(
                 f"Error in stream processing: {str(stream_error)}", exc_info=True
             )
             yield "⚠️ Error processing response, please try again later."
-
     except Exception as e:
         logger.error(
             f"Unexpected error in stream_agent_responses: {str(e)}", exc_info=True

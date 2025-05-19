@@ -2,20 +2,6 @@
 
 {% block body %}
 <div class="container">
-    <!-- 測試資訊 -->
-    <div class="row">
-        <div class="col-md-12">
-            <div class="alert alert-info">
-                <h4>Debug Information:</h4>
-                <p>Template loaded successfully!</p>
-                <p>Registered Bots Count: {{ registered_bots|length }}</p>
-                <p>Running Bots Count: {{ running_bots|length }}</p>
-                <p>Registered Bots: {{ registered_bots }}</p>
-                <p>Running Bots: {{ running_bots }}</p>
-            </div>
-        </div>
-    </div>
-
     <div class="row">
         <div class="col-md-12">
             <div class="panel panel-default">
@@ -42,12 +28,12 @@
         <div class="col-md-6">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <h3 class="panel-title">Registered Bots</h3>
+                    <h3 class="panel-title">Not Running Bots</h3>
                 </div>
                 <div class="panel-body">
-                    {% if registered_bots %}
+                    {% if not_running_bots %}
                     <div class="list-group">
-                        {% for bot_id in registered_bots %}
+                        {% for bot_id in not_running_bots %}
                         <div class="list-group-item">
                             <div class="row">
                                 <div class="col-md-8">
@@ -65,8 +51,7 @@
                     </div>
                     {% else %}
                     <div class="alert alert-info">
-                        <i class="fa fa-info-circle"></i> No bots registered. Please add bots in the Bot configuration
-                        page.
+                        <i class="fa fa-info-circle"></i> No bots not running.
                     </div>
                     {% endif %}
                 </div>

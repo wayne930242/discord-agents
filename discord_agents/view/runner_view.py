@@ -1,7 +1,7 @@
 from flask_admin import BaseView, expose
-from flask import flash, redirect, url_for, current_app
-
+from flask import flash, redirect, url_for
 from discord_agents.utils.logger import get_logger
+from discord_agents.domain.models import BotModel
 
 logger = get_logger("runner_view")
 
@@ -15,23 +15,16 @@ class BotManagementView(BaseView):
     def index(self):
         logger.info("Visit Bot Management page")
         try:
-            registered_bots = list(current_app.bot_runner.get_registered_bots().keys())
-            logger.info(f"Registered bots: {registered_bots}")
-
-            running_bots = []
-            for bot_id in registered_bots:
-                try:
-                    if bot_id in current_app.bot_runner.get_running_bots():
-                        running_bots.append(bot_id)
-                except Exception as e:
-                    logger.error(
-                        f"Error checking bot {bot_id} status: {str(e)}", exc_info=True
-                    )
+            from discord_agents.scheduler.tasks import get_all_bots_status
+            result = get_all_bots_status.apply().get()
+            logger.info(f"Bot status result: {result}")
+            running_bots = [bot_id for bot_id, info in result.items() if info.get("running")]  # running == True
+            not_running_bots = [bot_id for bot_id, info in result.items() if not info.get("running")]  # running == False
             logger.info(f"Running bots: {running_bots}")
-
+            logger.info(f"Not running bots: {not_running_bots}")
             return self.render(
                 "admin/bot_management.html",
-                registered_bots=registered_bots,
+                not_running_bots=not_running_bots,
                 running_bots=running_bots,
                 title="Bot Management",
             )
@@ -40,65 +33,65 @@ class BotManagementView(BaseView):
             flash("Error loading bot status", "error")
             return self.render(
                 "admin/bot_management.html",
-                registered_bots=[],
+                not_running_bots=[],
                 running_bots=[],
                 title="Bot Management",
             )
 
     @expose("/start/<bot_id>")
     def start_bot(self, bot_id):
+        from discord_agents.scheduler.tasks import start_bot_task
+
         logger.info(f"Receive request to start bot {bot_id}")
         try:
-            logger.info(f"Start bot {bot_id}...")
-            current_app.bot_runner.start_bot(bot_id)
-            logger.info(f"Bot {bot_id} started successfully")
-            flash(f"Bot {bot_id} started", "success")
-        except ValueError as e:
-            logger.error(f"Error starting bot {bot_id}: {str(e)}")
-            flash(str(e), "error")
+            start_bot_task.delay(bot_id)
+            logger.info(f"Bot {bot_id} started successfully (task dispatched)")
+            flash(f"Bot {bot_id} start task dispatched", "success")
         except Exception as e:
             logger.error(f"Error starting bot {bot_id}: {str(e)}", exc_info=True)
-            flash(f"An unexpected error occurred while starting bot {bot_id}.", "error")
+            flash(f"An error occurred while starting bot {bot_id}.", "error")
         return redirect(url_for(".index"))
 
     @expose("/stop/<bot_id>")
     def stop_bot(self, bot_id):
+        from discord_agents.scheduler.tasks import stop_bot_task
+
         logger.info(f"Receive request to stop bot {bot_id}")
         try:
-            logger.info(f"Start stopping bot {bot_id}...")
-            current_app.bot_runner.stop_bot(bot_id)
-            logger.info(f"Bot {bot_id} stopped successfully")
-            flash(f"Bot {bot_id} stopped", "success")
-        except ValueError as e:
-            logger.error(f"Error stopping bot {bot_id}: {str(e)}")
-            flash(str(e), "error")
+            stop_bot_task.delay(bot_id)
+            logger.info(f"Bot {bot_id} stop task dispatched")
+            flash(f"Bot {bot_id} stop task dispatched", "success")
         except Exception as e:
             logger.error(f"Error stopping bot {bot_id}: {str(e)}", exc_info=True)
-            flash(f"An unexpected error occurred while stopping bot {bot_id}.", "error")
+            flash(f"An error occurred while stopping bot {bot_id}.", "error")
         return redirect(url_for(".index"))
 
     @expose("/start-all")
     def start_all_bots(self):
+        from discord_agents.scheduler.tasks import start_bot_task
+
         logger.info("Receive request to start all bots")
         try:
-            logger.info("Start all bots...")
-            current_app.bot_runner.start_all_bots()
-            logger.info("All bots started successfully")
-            flash("All bots started", "success")
+            for bot in BotModel.query.all():
+                start_bot_task.delay(f"bot_{bot.id}")
+            logger.info("All bot start tasks dispatched")
+            flash("All bot start tasks dispatched", "success")
         except Exception as e:
             logger.error(f"Error starting all bots: {str(e)}", exc_info=True)
-            flash("An unexpected error occurred while starting all bots.", "error")
+            flash("An error occurred while starting all bots.", "error")
         return redirect(url_for(".index"))
 
     @expose("/stop-all")
     def stop_all_bots(self):
+        from discord_agents.scheduler.tasks import stop_bot_task
+
         logger.info("Receive request to stop all bots")
         try:
-            logger.info("Start stopping all bots...")
-            current_app.bot_runner.stop_all_bots()
-            logger.info("All bots stopped successfully")
-            flash("All bots stopped", "success")
+            for bot in BotModel.query.all():
+                stop_bot_task.delay(f"bot_{bot.id}")
+            logger.info("All bot stop tasks dispatched")
+            flash("All bot stop tasks dispatched", "success")
         except Exception as e:
             logger.error(f"Error stopping all bots: {str(e)}", exc_info=True)
-            flash("An unexpected error occurred while stopping all bots.", "error")
+            flash("An error occurred while stopping all bots.", "error")
         return redirect(url_for(".index"))

@@ -6,7 +6,7 @@ from discord_agents.utils.logger import get_logger
 
 logger = get_logger("env")
 
-load_dotenv()
+load_dotenv('.env')
 
 REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/agent_data.db")

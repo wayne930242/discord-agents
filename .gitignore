@@ -9,3 +9,6 @@ __pycache__/
 # Database
 *.db
 .mypy_cache/
+
+# Redis
+dump.rdb

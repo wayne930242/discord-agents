@@ -1,9 +1,10 @@
 import discord
 from discord.ext import commands
+import re
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from discord_agents.utils.call_agent import call_agent_async
+from discord_agents.utils.call_agent import stream_agent_responses
 from google.adk.agents import Agent
 from typing import Optional
 import logging
@@ -20,6 +21,8 @@ class AgentCog(commands.Cog):
         error_message: str,
         agent: Agent,
         use_function_map: Optional[dict[str, str]] = None,
+        dm_whitelist: Optional[list[str]] = None,
+        srv_whitelist: Optional[list[str]] = None,
     ):
         try:
             self.bot = bot
@@ -27,6 +30,8 @@ class AgentCog(commands.Cog):
             self.USE_FUNCTION_MAP = use_function_map or {}
             self.ERROR_MESSAGE = error_message
             self.user_sessions: dict[str, str] = {}
+            self._dm_whitelist = dm_whitelist or []
+            self._srv_whitelist = srv_whitelist or []
 
             # 初始化 session service
             try:
@@ -82,6 +87,21 @@ class AgentCog(commands.Cog):
             ):
                 return
 
+            # Whitelist check
+            if isinstance(message.channel, discord.DMChannel):
+                if str(message.author.id) not in self._dm_whitelist:
+                    logger.debug(f"DM from unauthorized user {message.author.id}")
+                    return
+            elif isinstance(message.channel, discord.TextChannel):
+                if self.bot.user is None or self.bot.user not in message.mentions:
+                    return
+                guild_id = str(getattr(message.guild, "id", ""))
+                if guild_id not in self._srv_whitelist:
+                    logger.debug(f"Message from unauthorized server {guild_id}")
+                    return
+            else:
+                return
+
             is_dm = isinstance(message.channel, discord.DMChannel)
             is_mention = self.bot.user and self.bot.user in message.mentions
 
@@ -89,11 +109,9 @@ class AgentCog(commands.Cog):
                 query = message.content.strip()
             elif is_mention:
                 if self.bot.user is not None:
-                    query = (
-                        message.content.replace(f"<@{self.bot.user.id}>", "", 1)
-                        .replace(f"<@!{self.bot.user.id}>", "", 1)
-                        .strip()
-                    )
+                    query = re.sub(
+                        rf"<@!?{self.bot.user.id}>", "", message.content, count=1
+                    ).strip()
             else:
                 return
 
@@ -115,11 +133,13 @@ class AgentCog(commands.Cog):
                     agent=self.agent,
                 )
 
-                async for part_data in call_agent_async(
+                async for part_data in stream_agent_responses(
                     query=query,
                     runner=runner,
                     user_id=user_adk_id,
                     session_id=session_id,
+                    use_function_map=self.USE_FUNCTION_MAP,
+                    only_final=True,
                 ):
                     try:
                         if isinstance(part_data, str):

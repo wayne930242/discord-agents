@@ -1,7 +1,7 @@
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import Admin
-from discord_agents.domain.models import db, Bot, Agent
-from flask import Flask, current_app
+from discord_agents.domain.models import db, BotModel, AgentModel
+from flask import Flask
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
@@ -66,7 +66,7 @@ class BotAgentView(ModelView):
         "tools",
     ]
 
-    def on_model_change(self, form: FlaskForm, model: Bot, is_created: bool) -> None:
+    def on_model_change(self, form: FlaskForm, model: BotModel, is_created: bool) -> None:
         for field in ["dm_whitelist", "srv_whitelist", "use_function_map"]:
             value = getattr(form, field).data
             try:
@@ -75,7 +75,7 @@ class BotAgentView(ModelView):
                 setattr(model, field, [] if field != "use_function_map" else {})
 
         if not model.agent:
-            agent = Agent(
+            agent = AgentModel(
                 name=form.name.data,
                 description=form.description.data,
                 role_instructions=form.role_instructions.data,
@@ -95,17 +95,17 @@ class BotAgentView(ModelView):
             model.agent.tools = form.tools.data
 
         try:
+            from discord_agents.scheduler.tasks import restart_bot_task
             bot_id = f"bot_{model.id}"
-            bot_runner = current_app.bot_runner
-            
-            bot_runner._bots[bot_id] = model.to_bot()
-            logger.info(f"Bot {bot_id} settings have been updated successfully")
+            db.session.commit()
+            restart_bot_task.delay(bot_id)
+            logger.info(f"Bot {bot_id} settings have been updated and restarted successfully")
         except Exception as e:
             logger.error(f"Failed to update bot {bot_id} settings: {str(e)}", exc_info=True)
             raise
 
     def on_form_prefill(self, form: FlaskForm, id: int) -> None:
-        bot = self.session.query(Bot).get(id)
+        bot = self.session.query(BotModel).get(id)
         if bot and bot.agent:
             form.name.data = bot.agent.name
             form.description.data = bot.agent.description
@@ -120,6 +120,6 @@ class BotAgentView(ModelView):
 
 def init_admin(app: Flask) -> Admin:
     admin = Admin(app, name="Discord Agents Admin", template_mode="bootstrap3")
-    admin.add_view(BotAgentView(Bot, db.session))
+    admin.add_view(BotAgentView(BotModel, db.session))
     admin.add_view(BotManagementView(name="Runner", endpoint="botmanagement"))
     return admin

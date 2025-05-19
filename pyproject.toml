@@ -23,6 +23,8 @@ dependencies = [
     "pytz>=2025.2",
     "redis>=6.1.0",
     "celery>=5.5.2",
+    "redlock-py>=1.0.8",
+    "supervisor>=4.2.5",
 ]
 
 [build-system]

@@ -1,43 +1,14 @@
-import os
 from gunicorn.app.base import BaseApplication
 from typing import Any, Dict, Optional
-from flask import Flask, redirect, url_for, request, Response
-from flask_admin import Admin
-from functools import wraps
-
-from discord_agents.scheduler.bot_runner import BotRunner
-from discord_agents.domain.models import db, Bot
-from discord_agents.view.bot_view import BotAgentView
-from discord_agents.view.runner_view import BotManagementView
-from discord_agents.env import DATABASE_URL
-from discord_agents.env import ADMIN_PASSWORD, ADMIN_USERNAME
+from flask import Flask
+from discord_agents.app import create_app
 from discord_agents.utils.logger import get_logger
+from discord_agents.scheduler.tasks import start_all_bots_task
+import redis
+from discord_agents.env import REDIS_URL
+from discord_agents.domain.models import BotModel
 
 logger = get_logger("main")
-
-
-def check_auth(username, password):
-    return username == ADMIN_USERNAME and password == ADMIN_PASSWORD
-
-
-def authenticate():
-    return Response(
-        "Could not verify your access level for that URL.\n"
-        "You have to login with proper credentials",
-        401,
-        {"WWW-Authenticate": 'Basic realm="Login Required"'},
-    )
-
-
-def requires_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-
-    return decorated
 
 
 class GunicornApp(BaseApplication):
@@ -54,76 +25,19 @@ class GunicornApp(BaseApplication):
         return self.application
 
 
-def create_app() -> Flask:
-    try:
-        logger.info("Creating Flask application...")
-        app = Flask(__name__)
-        app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-        app.config["SECRET_KEY"] = "your-secret-key"
-
-        @app.route("/health")
-        def health_check():
-            return "OK", 200
-
-        @app.route("/")
-        @requires_auth
-        def index():
-            return redirect(url_for("admin.index"))
-
-        template_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "discord_agents",
-            "view",
-            "templates",
-        )
-        app.template_folder = template_dir
-        logger.info(f"Template directory set to: {template_dir}")
-
-        db.init_app(app)
-        with app.app_context():
-            db.create_all()
-            logger.info("Database initialized successfully")
-
-        logger.info("Initializing BotRunner...")
-        bot_runner = BotRunner()
-        app.bot_runner = bot_runner
-        logger.info("BotRunner initialized")
-
-        with app.app_context():
-            logger.info("Registering bots from database...")
-            bots = Bot.query.all()
-            for bot in bots:
-                try:
-                    logger.info(f"Registering bot_{bot.id}...")
-                    bot_runner.register_bot(f"bot_{bot.id}", bot.to_bot())
-                    logger.info(f"Bot_{bot.id} registered successfully")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to register bot_{bot.id}: {str(e)}", exc_info=True
-                    )
-
-        try:
-            bot_runner.start_all_bots()
-            logger.info("All bots started successfully")
-        except Exception as e:
-            logger.error(f"Failed to start all bots: {str(e)}", exc_info=True)
-
-        logger.info("Initializing admin interface...")
-        admin = Admin(app, name="Discord Agents", template_mode="bootstrap4")
-        admin.add_view(BotAgentView(Bot, db.session))
-        admin.add_view(BotManagementView(name="Runner", endpoint="botmanagementview"))
-        logger.info("Admin interface initialized")
-
-        logger.info("Flask application created successfully")
-        return app
-
-    except Exception as e:
-        logger.error(f"Error creating Flask application: {str(e)}", exc_info=True)
-        raise
+def reset_all_bots_status():
+    r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+    app = create_app()
+    with app.app_context():
+        for bot in BotModel.query.all():
+            bot_id = bot.bot_id()
+            r.set(f"bot:{bot_id}:running", 0)
+            r.delete(f"bot:{bot_id}:stop_flag")
+    logger.info("All bot status has been reset")
 
 
 if __name__ == "__main__":
+    reset_all_bots_status()
     options = {
         "bind": "%s:%s" % ("0.0.0.0", "8080"),
         "worker_class": "gthread",
@@ -136,4 +50,5 @@ if __name__ == "__main__":
     }
 
     app = create_app()
+    start_all_bots_task.delay()
     GunicornApp(app, options).run()
