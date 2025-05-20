@@ -52,8 +52,11 @@ def start_bot_task(bot_id: str):
 
 
 def restart_bot_task(bot_id: str):
+    from time import sleep
+
     logger.info(f"Dispatch restart bot task for {bot_id}")
     stop_bot_task(bot_id)
+    sleep(1)
     start_bot_task(bot_id)
 
 
