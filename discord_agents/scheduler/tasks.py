@@ -1,13 +1,11 @@
 import asyncio
-from typing import Optional
-from discord_agents.models.bot import BotModel
 from discord_agents.utils.logger import get_logger
 from discord_agents.celery_app import celery_app
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig, MyBot
 from discord_agents.scheduler.broker import BotRedisClient
-from discord_agents.scheduler.helpers import get_flask_app
 
 logger = get_logger("celery_tasks")
+
 
 @celery_app.task
 def run_bot_task(
@@ -37,15 +35,3 @@ def stop_bot_task(bot: MyBot):
         logger.error(f"Error stopping bot {bot_id}: {str(e)}", exc_info=True)
     finally:
         redis_broker.set_idle(bot_id)
-
-
-@celery_app.task
-def get_all_bots_status():
-    with get_flask_app().app_context():
-        redis_broker = BotRedisClient()
-        all_db_bots = [bot.bot_id() for bot in BotModel.query.all()]
-
-        status = {}
-        for bot_id in all_db_bots:
-            status[bot_id] = redis_broker.get_state(bot_id)
-        return status

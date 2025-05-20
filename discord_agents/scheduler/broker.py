@@ -1,7 +1,7 @@
 from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
-from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional
 import json
 from redlock import Redlock
@@ -160,6 +160,12 @@ class BotRedisClient:
         except Exception as e:
             logger.error(f"[Redis Error] get_all_running_bots: {e}")
         return bot_ids
+
+    def get_all_bot_status(self) -> dict[str, dict[str, str]]:
+        status = {}
+        for bot_id in self.get_all_bots():
+            status[bot_id] = self.get_state(bot_id)
+        return status
 
     def reset_all_bots_status(self) -> None:
         for bot_id in self.get_all_bots():

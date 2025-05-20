@@ -3,8 +3,6 @@ from typing import Any, Dict, Optional
 from flask import Flask
 from discord_agents.app import create_app
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.tasks import dispatch_start_all_bots_task
-from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("main")
 
@@ -24,6 +22,8 @@ class GunicornApp(BaseApplication):
 
 
 if __name__ == "__main__":
+    from discord_agents.scheduler.broker import BotRedisClient
+
     redis_client = BotRedisClient()
     redis_client.reset_all_bots_status()
     options = {
@@ -38,5 +38,8 @@ if __name__ == "__main__":
     }
 
     app = create_app()
+
+    from discord_agents.scheduler.service import dispatch_start_all_bots_task
+
     dispatch_start_all_bots_task.delay()
     GunicornApp(app, options).run()

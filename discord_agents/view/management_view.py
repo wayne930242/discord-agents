@@ -14,9 +14,10 @@ class BotManagementView(BaseView):
     def index(self):
         logger.info("Visit Bot Management page")
         try:
-            from discord_agents.scheduler.tasks import get_all_bots_status
+            from discord_agents.scheduler.broker import BotRedisClient
 
-            result = get_all_bots_status.apply().get()
+            redis_broker = BotRedisClient()
+            result = redis_broker.get_all_bot_status()
             logger.info(f"Bot status result: {result}")
             running_bots = [
                 bot_id for bot_id, info in result.items() if info.get("running")
@@ -42,7 +43,7 @@ class BotManagementView(BaseView):
 
     @expose("/start/<bot_id>")
     def start_bot(self, bot_id):
-        from discord_agents.scheduler.tasks import dispatch_start_bot
+        from discord_agents.scheduler.service import dispatch_start_bot
 
         logger.info(f"Receive request to start bot {bot_id}")
         try:
@@ -56,11 +57,11 @@ class BotManagementView(BaseView):
 
     @expose("/stop/<bot_id>")
     def stop_bot(self, bot_id):
-        from discord_agents.scheduler.tasks import stop_bot_task
+        from discord_agents.scheduler.service import dispatch_stop_bot
 
         logger.info(f"Receive request to stop bot {bot_id}")
         try:
-            stop_bot_task.delay(bot_id)
+            dispatch_stop_bot(bot_id)
             logger.info(f"Bot {bot_id} stop task dispatched")
             flash(f"Bot {bot_id} stop task dispatched", "success")
         except Exception as e:
@@ -70,7 +71,7 @@ class BotManagementView(BaseView):
 
     @expose("/start-all")
     def start_all_bots(self):
-        from discord_agents.scheduler.tasks import dispatch_start_all_bots_task
+        from discord_agents.scheduler.service import dispatch_start_all_bots_task
 
         logger.info("Receive request to start all bots")
         try:
@@ -84,7 +85,7 @@ class BotManagementView(BaseView):
 
     @expose("/stop-all")
     def stop_all_bots(self):
-        from discord_agents.scheduler.tasks import dispatch_stop_all_bots_task
+        from discord_agents.scheduler.service import dispatch_stop_all_bots_task
 
         logger.info("Receive request to stop all bots")
         try:
