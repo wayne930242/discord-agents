@@ -8,7 +8,7 @@ from discord_agents.models.bot import db, BotModel
 from discord_agents.view.bot_view import BotAgentView
 from discord_agents.view.management_view import BotManagementView
 from discord_agents.utils.auth import requires_auth
-from discord_agents.scheduler.bot_worker import monitor_bots
+from discord_agents.scheduler.worker import monitor_bots
 
 import threading
 

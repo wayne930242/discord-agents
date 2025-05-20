@@ -25,6 +25,8 @@ class BotRedisClient:
         "should_stop",
         "stopping",
     }
+    BOT_INIT_CONFIG_KEY = "bot:{bot_id}:init_config"
+    BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
 
     def __new__(cls):
         if cls._instance is None:
@@ -63,9 +65,14 @@ class BotRedisClient:
         setup_config: Optional[MyAgentSetupConfig] = None,
     ) -> None:
         if init_config:
-            self._client.set(f"bot:{bot_id}:init_config", json.dumps(init_config))
+            self._client.set(
+                self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id), json.dumps(init_config)
+            )
         if setup_config:
-            self._client.set(f"bot:{bot_id}:setup_config", json.dumps(setup_config))
+            self._client.set(
+                self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id),
+                json.dumps(setup_config),
+            )
         self.set_state(bot_id, "should_start")
 
     def set_should_stop(self, bot_id: str) -> None:
@@ -126,7 +133,9 @@ class BotRedisClient:
         cursor = 0
         try:
             while True:
-                cursor, keys = self._client.scan(cursor=cursor, match="bot:*", count=100)
+                cursor, keys = self._client.scan(
+                    cursor=cursor, match="bot:*", count=100
+                )
                 for key in keys:
                     parts = key.split(":")
                     if len(parts) > 1:
@@ -154,11 +163,20 @@ class BotRedisClient:
 
     def reset_all_bots_status(self) -> None:
         for bot_id in self.get_all_bots():
+            # Set idle
             self.set_idle(bot_id)
+            # Clean up configs
+            self._client.delete(self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id))
+            self._client.delete(self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id))
+            # Clean up locks
+            self._client.delete(self.LOCK_STARTING_KEY.format(bot_id=bot_id))
+            self._client.delete(self.LOCK_STOPPING_KEY.format(bot_id=bot_id))
 
     def get_init_config(self, bot_id: str) -> Optional[MyBotInitConfig]:
         try:
-            init_config = self._client.get(f"bot:{bot_id}:init_config")
+            init_config = self._client.get(
+                self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id)
+            )
             return json.loads(init_config) if init_config else None
         except Exception as e:
             logger.error(f"[Redis Error] get_init_config: {e}")
@@ -166,7 +184,9 @@ class BotRedisClient:
 
     def get_setup_config(self, bot_id: str) -> Optional[MyAgentSetupConfig]:
         try:
-            setup_config = self._client.get(f"bot:{bot_id}:setup_config")
+            setup_config = self._client.get(
+                self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id)
+            )
             return json.loads(setup_config) if setup_config else None
         except Exception as e:
             logger.error(f"[Redis Error] get_setup_config: {e}")

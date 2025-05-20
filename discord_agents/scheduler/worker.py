@@ -2,7 +2,7 @@ import time
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.broker import BotRedisClient
-from discord_agents.scheduler.tasks import run_bot_task, dispatch_stop_bot_task
+from discord_agents.scheduler.tasks import run_bot_task, stop_bot_task
 from discord_agents.domain.bot import MyBot
 
 logger = get_logger("bot_worker")
@@ -45,7 +45,7 @@ def monitor_bots() -> None:
                 logger.info(
                     f"[monitor_bots] Detected bot {bot_id} should stop, calling stop() on BotThread..."
                 )
-                dispatch_stop_bot_task.delay(bot_id)
+                stop_bot_task.delay(bot_id)
                 del running_bots[bot_id]
                 redis_broker.set_idle(bot_id)
         time.sleep(3)
