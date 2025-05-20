@@ -1,7 +1,6 @@
 import os
 from flask import Flask, redirect, url_for
 from flask_admin import Admin
-from discord_agents.celery_app import celery_app
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
 from discord_agents.models.bot import db, BotModel
@@ -35,9 +34,6 @@ def create_app() -> Flask:
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         app.config["SECRET_KEY"] = SECRET_KEY
-
-        celery_app.conf.update(app.config)
-        celery_app.conf.update(worker_hijack_root_logger=False)
 
         bot_manager.start()
         logger.info("BotManager monitor thread started.")

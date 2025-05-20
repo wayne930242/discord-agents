@@ -6,7 +6,7 @@ from discord_agents.scheduler.broker import BotRedisClient
 from discord_agents.models.bot import BotModel
 from discord_agents.scheduler.helpers import get_flask_app
 
-logger = get_logger("celery_tasks")
+logger = get_logger("tasks")
 redis_broker = BotRedisClient()
 
 
