@@ -3,10 +3,8 @@ from typing import Any, Dict, Optional
 from flask import Flask
 from discord_agents.app import create_app
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.tasks import start_all_bots_task
-import redis
-from discord_agents.env import REDIS_URL
-from discord_agents.domain.models import BotModel
+from discord_agents.scheduler.tasks import dispatch_start_all_bots_task
+from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("main")
 
@@ -25,19 +23,9 @@ class GunicornApp(BaseApplication):
         return self.application
 
 
-def reset_all_bots_status():
-    r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-    app = create_app()
-    with app.app_context():
-        for bot in BotModel.query.all():
-            bot_id = bot.bot_id()
-            r.set(f"bot:{bot_id}:running", 0)
-            r.delete(f"bot:{bot_id}:stop_flag")
-    logger.info("All bot status has been reset")
-
-
 if __name__ == "__main__":
-    reset_all_bots_status()
+    redis_client = BotRedisClient()
+    redis_client.reset_all_bots_status()
     options = {
         "bind": "%s:%s" % ("0.0.0.0", "8080"),
         "worker_class": "gthread",
@@ -50,5 +38,5 @@ if __name__ == "__main__":
     }
 
     app = create_app()
-    start_all_bots_task.delay()
+    dispatch_start_all_bots_task.delay()
     GunicornApp(app, options).run()

@@ -4,9 +4,9 @@ from flask_admin import Admin
 from discord_agents.celery_app import celery_app
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
-from discord_agents.domain.models import db, BotModel
+from discord_agents.models.bot import db, BotModel
 from discord_agents.view.bot_view import BotAgentView
-from discord_agents.view.runner_view import BotManagementView
+from discord_agents.view.management_view import BotManagementView
 from discord_agents.utils.auth import requires_auth
 from discord_agents.scheduler.bot_worker import monitor_bots
 

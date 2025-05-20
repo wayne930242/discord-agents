@@ -1,12 +1,12 @@
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import Admin
-from discord_agents.domain.models import db, BotModel, AgentModel
+from discord_agents.models.bot import db, BotModel, AgentModel
 from flask import Flask
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
-from .runner_view import BotManagementView
+from .management_view import BotManagementView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 
@@ -95,10 +95,10 @@ class BotAgentView(ModelView):
             model.agent.tools = form.tools.data
 
         try:
-            from discord_agents.scheduler.tasks import restart_bot_task
+            from discord_agents.scheduler.tasks import dispatch_restart_bot_task
             bot_id = f"bot_{model.id}"
             db.session.commit()
-            restart_bot_task.delay(bot_id)
+            dispatch_restart_bot_task.delay(bot_id)
             logger.info(f"Bot {bot_id} settings have been updated and restarted successfully")
         except Exception as e:
             logger.error(f"Failed to update bot {bot_id} settings: {str(e)}", exc_info=True)

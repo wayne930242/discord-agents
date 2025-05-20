@@ -40,12 +40,6 @@ class BotModel(db.Model):
     def bot_id(self) -> str:
         return f"bot_{self.id}"
 
-    def to_bot(self) -> MyBot:
-        my_bot = MyBot(self.to_init_config)
-        my_bot.setup_my_agent(self.to_setup_agent_config())
-
-        return my_bot
-
     def to_init_config(self) -> MyBotInitConfig:
         return MyBotInitConfig(
             bot_id=self.bot_id(),
@@ -68,3 +62,9 @@ class BotModel(db.Model):
             error_message=self.error_message,
             tools=self.agent.tools,
         )
+
+    def to_bot(self) -> MyBot:
+        my_bot = MyBot(self.to_init_config)
+        my_bot.setup_my_agent(self.to_setup_agent_config())
+
+        return my_bot

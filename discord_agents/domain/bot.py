@@ -1,23 +1,18 @@
 from discord.ext import commands
 import discord
 from typing import Optional, TypedDict
-import redis
-from celery import chain
-import asyncio
 
+from discord_agents.scheduler.broker import BotRedisClient
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.env import (
     DATABASE_URL,
     DM_ID_WHITE_LIST,
     SERVER_ID_WHITE_LIST,
-    REDIS_URL,
 )
 from discord_agents.utils.logger import get_logger
 
 logger = get_logger("bot")
-
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
 class MyBotInitConfig(TypedDict, total=False):
@@ -56,7 +51,7 @@ class MyBot:
             intents = self._init_intents()
             self._bot = self._init_bot(self._command_prefix, intents)
             self._bot.on_ready = self._on_ready
-            self._bot_id = config["bot_id"]
+            self.bot_id = config["bot_id"]
 
             logger.info(
                 f"MyBot initialization completed for token ending with: ...{self._token[-4:] if len(self._token) > 4 else self._token}"
@@ -152,8 +147,6 @@ class MyBot:
             if self._cog:
                 await self._bot.add_cog(self._cog)
                 logger.info(f"Cog added successfully: {self._cog}")
-            # Sync status to Redis
-            redis_client.set(f"bot:{self._bot_id}:running", 1)
         except Exception as e:
             logger.error(f"Error in on_ready event: {str(e)}", exc_info=True)
 
@@ -161,39 +154,24 @@ class MyBot:
         try:
             logger.info("Starting bot...")
             await self._bot.start(self._token)
+            redis_broker = BotRedisClient()
+            redis_broker.set_is_running(self.bot_id, True)
         except Exception as e:
             logger.error(f"Error running bot: {str(e)}", exc_info=True)
             raise
 
-    async def remove_cog(self) -> None:
-        if self._cog:
-            cog_name = self._cog.qualified_name
-            logger.info(f"Removing cog: {cog_name}")
-            try:
-                await asyncio.wait_for(self._bot.remove_cog(cog_name), timeout=5)
-                logger.info(f"Cog removed: {cog_name}")
-            except asyncio.TimeoutError:
-                logger.error(f"Timeout when removing cog: {cog_name}")
-            except Exception as e:
-                logger.error(f"Error removing cog {cog_name}: {e}", exc_info=True)
-
-    async def close_bot_session(self) -> None:
+    async def stop(self) -> None:
+        logger.info(f"[MyBot] close_bot_session called for bot_id={self.bot_id}")
         try:
-            await self.remove_cog()
-            logger.info("Closing bot session...")
-            try:
-                await asyncio.wait_for(self._bot.close(), timeout=5)
-                logger.info("Bot session closed successfully.")
-            except asyncio.TimeoutError:
-                logger.error("Timeout when closing bot session!")
-            except Exception as e:
-                logger.error(f"Error when closing bot session: {e}", exc_info=True)
-            # Sync status to Redis
-            redis_client.set(f"bot:{self._bot_id}:running", 0)
+            await self._bot.close()
+            logger.info("Bot session closed successfully.")
         except Exception as e:
-            logger.error(f"Error in close_bot_session: {e}", exc_info=True)
-            raise
+            logger.error(f"Error when closing bot session: {e}", exc_info=True)
+            # Sync status to Redis
+            redis_broker = BotRedisClient()
+            redis_broker.set_is_running(self.bot_id, False)
 
     def is_running(self) -> bool:
-        running = redis_client.get(f"bot:{self._bot_id}:running")
+        redis_broker = BotRedisClient()
+        running = redis_broker.get_is_running(self.bot_id)
         return running == "1"
