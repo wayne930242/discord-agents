@@ -17,12 +17,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
-COPY supervisord.conf /app/supervisord.conf
 
 VOLUME ["/app/data"]
 
 EXPOSE ${PORT}
 
-ENTRYPOINT []
-
-CMD ["supervisord", "-c", "/app/supervisord.conf"]
+CMD ["python", "-m", "discord_agents.main"]

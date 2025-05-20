@@ -1,10 +1,12 @@
 from discord.ext import commands
 import discord
 from typing import Optional
+import asyncio
 
 from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
+from discord_agents.domain.tools import Tools
 from discord_agents.env import (
     DATABASE_URL,
     DM_ID_WHITE_LIST,
@@ -33,7 +35,12 @@ class MyBot:
             self._bot = self._init_bot(self._command_prefix, intents)
             self._bot.on_ready = self._on_ready
             self.bot_id = config["bot_id"]
+            try:
+                import asyncio
 
+                self.loop = asyncio.get_running_loop()
+            except RuntimeError:
+                self.loop = None
             logger.info(
                 f"MyBot initialization completed for token ending with: ...{self._token[-4:] if len(self._token) > 4 else self._token}"
             )
@@ -104,11 +111,12 @@ class MyBot:
                 role_instructions=config["role_instructions"],
                 tool_instructions=config["tool_instructions"],
                 agent_model=config["agent_model"],
-                tools=config["tools"],
+                tools=Tools.get_tools(config["tools"]),
             )
 
             self._cog = AgentCog(
                 bot=self._bot,
+                bot_id=self.bot_id,
                 app_name=config["app_name"],
                 db_url=DATABASE_URL,
                 use_function_map=config["use_function_map"],
@@ -134,15 +142,22 @@ class MyBot:
     async def run(self) -> None:
         try:
             logger.info("Starting bot...")
+            import asyncio
+
+            if self.loop is None:
+                self.loop = asyncio.get_running_loop()
             await self._bot.start(self._token)
         except Exception as e:
             logger.error(f"Error running bot: {str(e)}", exc_info=True)
             raise
 
     async def stop(self) -> None:
-        logger.info(f"[MyBot] close_bot_session called for bot_id={self.bot_id}")
         try:
+            logger.info("Stopping bot...")
             await self._bot.close()
-            logger.info("Bot session closed successfully.")
+        except asyncio.CancelledError:
+            logger.warning("Stop coroutine was cancelled inside MyBot.stop()")
+            return
         except Exception as e:
-            logger.error(f"Error when closing bot session: {e}", exc_info=True)
+            logger.error(f"Error stopping bot: {str(e)}", exc_info=True)
+            raise

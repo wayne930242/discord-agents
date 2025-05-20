@@ -4,18 +4,19 @@ import re
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from discord_agents.utils.call_agent import stream_agent_responses
 from google.adk.agents import Agent
 from typing import Optional
-import logging
+from discord_agents.utils.call_agent import stream_agent_responses
+from discord_agents.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("base_cog")
 
 
 class AgentCog(commands.Cog):
     def __init__(
         self,
         bot: commands.Bot,
+        bot_id: str,
         app_name: str,
         db_url: str,
         error_message: str,
@@ -32,8 +33,8 @@ class AgentCog(commands.Cog):
             self.user_sessions: dict[str, str] = {}
             self._dm_whitelist = dm_whitelist or []
             self._srv_whitelist = srv_whitelist or []
+            self.bot_id = bot_id
 
-            # 初始化 session service
             try:
                 self.session_service = DatabaseSessionService(db_url)
                 logger.info(f"Session Service initialized for app: {app_name}")

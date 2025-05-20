@@ -26,6 +26,7 @@ if __name__ == "__main__":
 
     redis_client = BotRedisClient()
     redis_client.reset_all_bots_status()
+
     options = {
         "bind": "%s:%s" % ("0.0.0.0", "8080"),
         "worker_class": "gthread",
@@ -39,7 +40,7 @@ if __name__ == "__main__":
 
     app = create_app()
 
-    from discord_agents.scheduler.service import dispatch_start_all_bots_task
+    from discord_agents.scheduler.tasks import start_all_bots_task
 
-    dispatch_start_all_bots_task.delay()
+    start_all_bots_task()
     GunicornApp(app, options).run()

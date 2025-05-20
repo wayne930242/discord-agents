@@ -9,7 +9,7 @@ import json
 from .management_view import BotManagementView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.service import dispatch_restart_bot
+from discord_agents.scheduler.tasks import restart_bot_task
 
 logger = get_logger("bot_view")
 
@@ -98,7 +98,7 @@ class BotAgentView(ModelView):
         try:
             bot_id = f"bot_{model.id}"
             db.session.commit()
-            dispatch_restart_bot(bot_id)
+            restart_bot_task(bot_id)
             logger.info(f"Bot {bot_id} settings have been updated and restarted successfully")
         except Exception as e:
             logger.error(f"Failed to update bot {bot_id} settings: {str(e)}", exc_info=True)

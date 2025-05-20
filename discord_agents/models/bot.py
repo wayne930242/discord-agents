@@ -4,7 +4,6 @@ from sqlalchemy.orm import relationship
 
 
 from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
-from discord_agents.domain.tools import Tools
 
 db = SQLAlchemy()
 

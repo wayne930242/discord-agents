@@ -1,7 +1,7 @@
 from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
-from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional
 import json
 from redlock import Redlock
@@ -93,9 +93,6 @@ class BotRedisClient:
                 logger.info(f"[Redlock] Set state=starting for {bot_id}")
                 return True
             else:
-                logger.info(
-                    f"[Redlock] Cannot set starting, current state={current} for {bot_id}"
-                )
                 return False
         finally:
             self._redlock.unlock(lock)
@@ -121,9 +118,6 @@ class BotRedisClient:
                 logger.info(f"[Redlock] Set state=stopping for {bot_id}")
                 return True
             else:
-                logger.info(
-                    f"[Redlock] Cannot set stopping, current state={current} for {bot_id}"
-                )
                 return False
         finally:
             self._redlock.unlock(lock)

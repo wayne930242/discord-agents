@@ -8,9 +8,7 @@ from discord_agents.models.bot import db, BotModel
 from discord_agents.view.bot_view import BotAgentView
 from discord_agents.view.management_view import BotManagementView
 from discord_agents.utils.auth import requires_auth
-from discord_agents.scheduler.worker import monitor_bots
-
-import threading
+from discord_agents.scheduler.worker import bot_manager
 
 logger = get_logger("app")
 
@@ -41,9 +39,8 @@ def create_app() -> Flask:
         celery_app.conf.update(app.config)
         celery_app.conf.update(worker_hijack_root_logger=False)
 
-        t = threading.Thread(target=monitor_bots, daemon=True)
-        t.start()
-        logger.info("monitor_bots thread started.")
+        bot_manager.start()
+        logger.info("BotManager monitor thread started.")
 
         @app.route("/health")
         def health_check():
