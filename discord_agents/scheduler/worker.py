@@ -7,8 +7,6 @@ from discord_agents.scheduler.tasks import listen_bots_task
 
 logger = get_logger("worker")
 
-bot_id_set: set[str] = set()
-
 
 class BotManager:
     _instance = None

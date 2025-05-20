@@ -98,5 +98,5 @@ def try_stopping_bot_task(bot_id: str):
 
 
 def listen_bots_task(bot_id: str):
-    try_starting_bot_task(bot_id)
     try_stopping_bot_task(bot_id)
+    try_starting_bot_task(bot_id)
