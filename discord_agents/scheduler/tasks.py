@@ -56,7 +56,7 @@ def restart_bot_task(bot_id: str):
 
     logger.info(f"Dispatch restart bot task for {bot_id}")
     stop_bot_task(bot_id)
-    sleep(1)
+    sleep(3)
     start_bot_task(bot_id)
 
 
