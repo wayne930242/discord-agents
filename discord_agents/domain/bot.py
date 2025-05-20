@@ -2,7 +2,6 @@ from discord.ext import commands
 import discord
 from typing import Optional, TypedDict
 
-from discord_agents.scheduler.broker import BotRedisClient
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.env import (
@@ -154,8 +153,6 @@ class MyBot:
         try:
             logger.info("Starting bot...")
             await self._bot.start(self._token)
-            redis_broker = BotRedisClient()
-            redis_broker.set_is_running(self.bot_id, True)
         except Exception as e:
             logger.error(f"Error running bot: {str(e)}", exc_info=True)
             raise
@@ -167,11 +164,3 @@ class MyBot:
             logger.info("Bot session closed successfully.")
         except Exception as e:
             logger.error(f"Error when closing bot session: {e}", exc_info=True)
-            # Sync status to Redis
-            redis_broker = BotRedisClient()
-            redis_broker.set_is_running(self.bot_id, False)
-
-    def is_running(self) -> bool:
-        redis_broker = BotRedisClient()
-        running = redis_broker.get_is_running(self.bot_id)
-        return running == "1"
