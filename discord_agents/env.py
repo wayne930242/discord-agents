@@ -19,10 +19,10 @@ TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 
 AGENT_MODEL: str = os.getenv("AGENT_MODEL", "gemini-2.5-flash-preview-04-17")
 
-SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
 
-ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "")
-ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "")
+ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin")
+ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
 
 REQUIRED_ENV_VARS: dict[str, Any] = {
     "DATABASE_URL": DATABASE_URL,
