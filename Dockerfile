@@ -16,10 +16,13 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-ENV PATH="/app/.venv/bin:$PATH"
-
 VOLUME ["/app/data"]
 
 EXPOSE ${PORT}
 
-CMD ["python", "-m", "discord_agents.main"]
+ENV PATH="/app/.venv/bin:$PATH"
+ENV FLASK_APP=manage.py
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
