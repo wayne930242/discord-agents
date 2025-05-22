@@ -11,10 +11,14 @@ def dice_tool(dice_count: int, dice_sides: int):
         dice_sides (int): The number of sides on each die.
 
     Returns:
-        int: The total result of all dice rolled.
+        dict: {
+            sequence (list of int): A list of dice rolls.
+            total (int): The total result of all dice rolled.
+        }
     """
-
-    return random.randint(1, dice_sides) * dice_count
+    sequence = [random.randint(1, dice_sides) for _ in range(dice_count)]
+    total = sum(sequence)
+    return {"sequence": sequence, "total": total}
 
 
 rpg_dice_tool = FunctionTool(dice_tool)
