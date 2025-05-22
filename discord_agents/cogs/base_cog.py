@@ -89,18 +89,13 @@ class AgentCog(commands.Cog):
         session_id: str,
     ):
         try:
-            is_gemini_model = False
-            if hasattr(self.agent, "model"):
-                model_name = getattr(self.agent, "model", None)
-                if model_name and "gemini" in str(model_name).lower():
-                    is_gemini_model = True
             async for part_data in stream_agent_responses(
                 query=query,
                 runner=runner,
                 user_id=user_adk_id,
                 session_id=session_id,
                 use_function_map=self.USE_FUNCTION_MAP,
-                only_final=is_gemini_model,
+                only_final=True,
             ):
                 try:
                     if isinstance(part_data, str):
