@@ -22,5 +22,5 @@ class Tools:
         return [TOOLS_DICT[name] for name in names]
 
     @classmethod
-    def tool_names(cls) -> list[str]:
+    def get_tool_names(cls) -> list[str]:
         return [name for name in TOOLS_DICT.keys()]

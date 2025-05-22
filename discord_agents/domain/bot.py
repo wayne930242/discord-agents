@@ -110,7 +110,7 @@ class MyBot:
                 description=config["description"],
                 role_instructions=config["role_instructions"],
                 tool_instructions=config["tool_instructions"],
-                agent_model=config["agent_model"],
+                model_name=config["agent_model"],
                 tools=Tools.get_tools(config["tools"]),
             )
 
