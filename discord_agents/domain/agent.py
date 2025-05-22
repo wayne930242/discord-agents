@@ -28,13 +28,41 @@ class LLMs:
             "agent": LLM_TYPE.GEMINI,
             "price_per_1M": 3.50,
         },
-        {"model": "gpt-4.1", "agent": LLM_TYPE.GPT, "price_per_1M": 3.50},
-        {"model": "gpt-4.1-nano", "agent": LLM_TYPE.GPT, "price_per_1M": 0.17},
-        {"model": "gpt-4.1-mini", "agent": LLM_TYPE.GPT, "price_per_1M": 0.70},
-        {"model": "gpt-4o", "agent": LLM_TYPE.GPT, "price_per_1M": 3.50},
-        {"model": "gpt-4o-mini", "agent": LLM_TYPE.GPT, "price_per_1M": 0.26},
-        {"model": "grok-3-mini", "agent": LLM_TYPE.GROK, "price_per_1M": 0.35},
-        {"model": "grok-3", "agent": LLM_TYPE.GROK, "price_per_1M": 6.00},
+        {
+            "model": "gpt-4.1",
+            "agent": LLM_TYPE.GPT,
+            "price_per_1M": 3.50,
+        },
+        {
+            "model": "gpt-4.1-nano",
+            "agent": LLM_TYPE.GPT,
+            "price_per_1M": 0.17,
+        },
+        {
+            "model": "gpt-4.1-mini",
+            "agent": LLM_TYPE.GPT,
+            "price_per_1M": 0.70,
+        },
+        {
+            "model": "gpt-4o",
+            "agent": LLM_TYPE.GPT,
+            "price_per_1M": 3.50,
+        },
+        {
+            "model": "gpt-4o-mini",
+            "agent": LLM_TYPE.GPT,
+            "price_per_1M": 0.26,
+        },
+        {
+            "model": "xai/grok-3-mini",
+            "agent": LLM_TYPE.GROK,
+            "price_per_1M": 0.35,
+        },
+        {
+            "model": "xai/grok-3",
+            "agent": LLM_TYPE.GROK,
+            "price_per_1M": 6.00,
+        },
     ]
 
     @staticmethod
@@ -65,7 +93,7 @@ class MyAgent:
         role_instructions: str,
         tool_instructions: str,
         model_name: str,
-        tools: Union[list[str], list[BaseTool]] = None,
+        tools: Optional[Union[list[str], list[BaseTool]]] = None,
     ):
         if tools is None:
             tools = []

@@ -6,7 +6,7 @@ from discord_agents.utils.logger import get_logger
 
 logger = get_logger("env")
 
-load_dotenv('.env')
+load_dotenv(".env")
 
 REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/agent_data.db")
@@ -15,7 +15,11 @@ DM_ID_WHITE_LIST: list[str] = os.getenv("DM_ID_WHITE_LIST", "").split(",")
 SERVER_ID_WHITE_LIST: list[str] = os.getenv("SERVER_ID_WHITE_LIST", "").split(",")
 
 GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+
 TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+
+XAI_API_KEY: str = os.getenv("XAI_API_KEY", "")
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 AGENT_MODEL: str = os.getenv("AGENT_MODEL", "gemini-2.5-flash-preview-04-17")
 
@@ -29,6 +33,8 @@ REQUIRED_ENV_VARS: dict[str, Any] = {
     "GOOGLE_API_KEY": GOOGLE_API_KEY,
     "TAVILY_API_KEY": TAVILY_API_KEY,
     "REDIS_URL": REDIS_URL,
+    "XAI_API_KEY": XAI_API_KEY,
+    "OPENAI_API_KEY": OPENAI_API_KEY,
 }
 
 missing_vars: list[str] = []
