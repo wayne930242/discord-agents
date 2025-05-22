@@ -54,7 +54,7 @@ class MyBot:
         return token
 
     def _init_command_prefix(self, command_prefix_param: Optional[str]) -> str:
-        prefix = command_prefix_param or "!"
+        prefix = command_prefix_param or "="
         logger.info(f"Command prefix set to: {prefix}")
         return prefix
 
@@ -96,6 +96,17 @@ class MyBot:
             intents=intents,
             help_command=None,
         )
+
+        @bot.command(name="help")
+        async def help_command(ctx):
+            help_text = (
+                "**All Commands:**\n"
+                f"`{self._command_prefix}help` - Show this help message\n"
+                f"`{self._command_prefix}clear_sessions [user_id]` - Clear all chat sessions for yourself (or for a specified user by an admin).\n"
+                "  - Only available in DMs or in server channels if you have admin permissions.\n"
+            )
+            await ctx.send(help_text)
+
         logger.info("Bot instance created successfully")
         return bot
 
