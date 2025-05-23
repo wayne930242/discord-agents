@@ -162,7 +162,7 @@ class MyAgent:
         role_instructions: str,
         tool_instructions: str,
         model_name: str,
-        tools: Optional[Union[list[str], list[BaseTool]]] = None,
+        tools: Optional[Union[list[str]]] = None,
     ):
         if tools is None:
             tools = []
@@ -170,8 +170,10 @@ class MyAgent:
         self.description = description
         self.instructions = f"{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
         if tools and all(isinstance(t, str) for t in tools):
+            self.tool_names = tools
             self.tools = Tools.get_tools(tools)
         else:
+            self.tool_names = []
             self.tools = tools or []
 
         self._llm_type = LLMs.find_model_type(model_name)
@@ -204,6 +206,14 @@ class MyAgent:
 
     def lite_model(self):
         return LiteLlm(model=self.model_name)
+
+    def get_info(self) -> tuple[str, str, str, str]:
+        return (
+            self.name,
+            self.model_name,
+            self.instructions,
+            "\n".join(self.tool_names),
+        )
 
     @staticmethod
     def get_time_instructions():

@@ -156,3 +156,6 @@ class MyBot:
         except Exception as e:
             logger.error(f"Error stopping bot: {str(e)}", exc_info=True)
             return Err(str(e))
+
+    def get_my_agent(self) -> MyAgent:
+        return self._cog.my_agent

@@ -5,7 +5,6 @@ from result import Result, Ok, Err
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from google.adk.agents import Agent
 from typing import Optional
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
@@ -175,22 +174,18 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
-        try:
-            runner = Runner(
-                app_name=self.APP_NAME,
-                session_service=self.session_service,
-                agent=self.my_agent.get_agent(),
+        runner = Runner(
+            app_name=self.APP_NAME,
+            session_service=self.session_service,
+            agent=self.my_agent.get_agent(),
+        )
+        stream_result = await self.process_agent_stream_responses(
+            message, runner, query, user_adk_id, session_id
+        )
+        if stream_result.is_err():
+            logger.error(
+                f"process_agent_stream_responses failed: {stream_result.err()}"
             )
-            stream_result = await self.process_agent_stream_responses(
-                message, runner, query, user_adk_id, session_id
-            )
-            if stream_result.is_err():
-                logger.error(
-                    f"process_agent_stream_responses failed: {stream_result.err()}"
-                )
-        except Exception as e:
-            logger.error(f"_on_message 發生例外: {e}", exc_info=True)
-            await message.channel.send(self.ERROR_MESSAGE)
 
     def check_clear_sessions_permission(
         self, ctx, target_user_id: Optional[str]
@@ -233,6 +228,25 @@ class AgentCog(commands.Cog):
             )
         await ctx.send(f"Cleared {len(session_list)} sessions.")
 
+    @commands.command(name="info")
+    async def info_command(self, ctx):
+        from discord_agents.scheduler.worker import BotManager
+
+        try:
+            bot_manager = BotManager()
+            bot = bot_manager.get_bot(self.bot_id)
+            agent = bot.get_my_agent()
+            name, model, instructions, tools = agent.get_info()
+            await ctx.send(
+                f"**機器人名稱:** {name}\n"
+                f"**模型名稱:** {model}\n"
+                f"**提示詞:** ```{instructions}```\n"
+                f"{tools if tools else ''}```"
+            )
+        except Exception as e:
+            logger.error(f"Error in info_command: {e}", exc_info=True)
+            await ctx.send("Error in info_command")
+
     @commands.command(name="help")
     async def help_command(self, ctx):
         help_text = (
@@ -242,5 +256,6 @@ class AgentCog(commands.Cog):
             "  - 在 DM 執行會清除自己的 session。\n"
             "  - 在頻道執行會清除該頻道的 session（需管理員權限可指定 target_id）。\n"
             "  - target_id 可為 `channel_<channel_id>` 或 `dm_<user_id>`，不填則預設為當前。\n"
+            f"`{self.bot.command_prefix}info` - 顯示機器人資訊\n"
         )
         await ctx.send(help_text)
