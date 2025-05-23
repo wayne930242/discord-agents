@@ -106,9 +106,7 @@ async def stream_agent_responses(
 
         broker_client = BotRedisClient()
         try:
-            history_items = broker_client.get_message_history(
-                user_id, session_id, model
-            )
+            history_items = broker_client.get_message_history(model)
         except Exception as e:
             logger.warning(f"Failed to get broker history: {e}")
             history_items = []
@@ -214,13 +212,11 @@ async def stream_agent_responses(
                             ).strip()
                             try:
                                 broker_client.add_message_history(
-                                    user_id,
-                                    session_id,
-                                    model,
-                                    query,
-                                    query_tokens,
-                                    interval_seconds,
-                                    time.time(),
+                                    model=model,
+                                    text=query,
+                                    tokens=query_tokens,
+                                    interval_seconds=interval_seconds,
+                                    timestamp=time.time(),
                                 )
                             except Exception as e:
                                 logger.warning(f"Failed to add broker history: {e}")

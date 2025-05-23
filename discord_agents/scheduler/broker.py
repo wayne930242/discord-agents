@@ -29,7 +29,7 @@ class BotRedisClient:
     }
     BOT_INIT_CONFIG_KEY = "bot:{bot_id}:init_config"
     BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
-    HISTORY_KEY = "history:{user_id}:{session_id}:{model}"
+    HISTORY_KEY = "history:{model}"
 
     def __new__(cls):
         if cls._instance is None:
@@ -208,8 +208,6 @@ class BotRedisClient:
 
     def add_message_history(
         self,
-        user_id: str,
-        session_id: str,
         model: str,
         text: str,
         tokens: int,
@@ -219,9 +217,7 @@ class BotRedisClient:
         if interval_seconds == 0 or timestamp is None or timestamp == float("inf"):
             return
         expire_at = timestamp + interval_seconds if interval_seconds > 0 else None
-        key = self.HISTORY_KEY.format(
-            user_id=user_id, session_id=session_id, model=model
-        )
+        key = self.HISTORY_KEY.format(model=model)
         item = json.dumps(
             {
                 "text": text,
@@ -235,13 +231,9 @@ class BotRedisClient:
         except Exception as e:
             logger.error(f"[Redis Error] add_message_history: {e}")
 
-    def get_message_history(
-        self, user_id: str, session_id: str, model: str
-    ) -> list[dict]:
-        self.prune_message_history(user_id, session_id, model)
-        key = self.HISTORY_KEY.format(
-            user_id=user_id, session_id=session_id, model=model
-        )
+    def get_message_history(self, model: str) -> list[dict]:
+        self.prune_message_history(model)
+        key = self.HISTORY_KEY.format(model=model)
         now = time.time()
         result = []
         try:
@@ -258,10 +250,8 @@ class BotRedisClient:
             logger.error(f"[Redis Error] get_message_history: {e}")
         return result
 
-    def prune_message_history(self, user_id: str, session_id: str, model: str):
-        key = self.HISTORY_KEY.format(
-            user_id=user_id, session_id=session_id, model=model
-        )
+    def prune_message_history(self, model: str):
+        key = self.HISTORY_KEY.format(model=model)
         now = time.time()
         try:
             items = self._client.lrange(key, 0, -1)
