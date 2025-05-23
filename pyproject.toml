@@ -26,6 +26,7 @@ dependencies = [
     "supervisor>=4.2.5",
     "litellm>=1.70.2",
     "flask-migrate>=4.1.0",
+    "result>=0.17.0",
 ]
 
 [build-system]
