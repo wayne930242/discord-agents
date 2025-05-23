@@ -91,6 +91,7 @@ class MyBot:
             intents=intents,
             help_command=None,
         )
+        return bot
 
     def setup_my_agent(
         self,
