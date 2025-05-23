@@ -2,7 +2,7 @@ from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
-from typing import Optional
+from typing import Optional, Literal
 import json
 from redlock import Redlock
 
@@ -21,6 +21,7 @@ class BotRedisClient:
         "idle",
         "should_start",
         "starting",
+        "should_restart",
         "running",
         "should_stop",
         "stopping",
@@ -78,6 +79,9 @@ class BotRedisClient:
     def set_should_stop(self, bot_id: str) -> None:
         self.set_state(bot_id, "should_stop")
 
+    def set_should_restart(self, bot_id: str) -> None:
+        self.set_state(bot_id, "should_restart")
+
     def lock_and_set_starting_if_should_start(
         self, bot_id: str, expire_ms: int = 10000
     ) -> bool:
@@ -105,7 +109,7 @@ class BotRedisClient:
 
     def lock_and_set_stopping_if_should_stop(
         self, bot_id: str, expire_ms: int = 10000
-    ) -> bool:
+    ) -> Literal["to_idle", "to_start", False]:
         lock = self._acquire_lock(
             self.LOCK_STOPPING_KEY.format(bot_id=bot_id), expire_ms
         )
@@ -116,7 +120,11 @@ class BotRedisClient:
             if current == "should_stop":
                 self.set_state(bot_id, "stopping")
                 logger.info(f"[Redlock] Set state=stopping for {bot_id}")
-                return True
+                return "to_idle"
+            elif current == "should_restart":
+                self.set_state(bot_id, "starting")
+                logger.info(f"[Redlock] Set state=starting for {bot_id}")
+                return "to_start"
             else:
                 return False
         finally:
@@ -191,3 +199,7 @@ class BotRedisClient:
         except Exception as e:
             logger.error(f"[Redis Error] get_setup_config: {e}")
             return None
+
+    def clear_config(self, bot_id: str) -> None:
+        self._client.delete(self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id))
+        self._client.delete(self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id))

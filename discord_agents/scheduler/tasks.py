@@ -10,35 +10,12 @@ logger = get_logger("tasks")
 redis_broker = BotRedisClient()
 
 
-def run_bot_task(
-    bot_id: str, init_data: MyBotInitConfig, setup_data: MyAgentSetupConfig
-):
-    logger.info(f"Dispatch run bot task for {bot_id}")
-    try:
-        my_bot = MyBot(init_data)
-        my_bot.setup_my_agent(setup_data)
-        redis_broker.set_running(bot_id)
-    except Exception as e:
-        logger.error(f"Error running bot {bot_id}: {str(e)}", exc_info=True)
-        redis_broker.set_idle(bot_id)
-
-
-def bot_running_task(bot_id: str):
-    logger.info(f"Dispatch bot running task for {bot_id}")
-    redis_broker.set_running(bot_id)
-
-
 def bot_idle_task(bot_id: str):
     logger.info(f"Dispatch bot idle task for {bot_id}")
     redis_broker.set_idle(bot_id)
 
 
-def stop_bot_task(bot_id: str):
-    logger.info(f"Dispatch stop bot task for {bot_id}")
-    redis_broker.set_should_stop(bot_id)
-
-
-def start_bot_task(bot_id: str):
+def should_start_bot_in_model_task(bot_id: str):
     logger.info(f"Dispatch start bot task for {bot_id}")
     with get_flask_app().app_context():
         db_id = int(bot_id.replace("bot_", ""))
@@ -46,36 +23,60 @@ def start_bot_task(bot_id: str):
         if not bot:
             logger.error(f"Bot {bot_id} not found in DB")
             return
-        redis_broker.set_should_start(
-            bot_id, bot.to_init_config(), bot.to_setup_agent_config()
+        should_start_bot_task(
+            bot.bot_id(), bot.to_init_config(), bot.to_setup_agent_config()
         )
 
 
-def restart_bot_task(bot_id: str):
-    from time import sleep
+def should_start_bot_task(
+    bot_id: str, init_data: MyBotInitConfig, setup_data: MyAgentSetupConfig
+):
+    """Set bot to should_start state and clear config"""
+    logger.info(f"Dispatch start bot task for {bot_id}")
+    redis_broker.set_should_start(bot_id, init_data, setup_data)
 
+
+def should_restart_bot_task(bot_id: str):
+    """Set bot to should_restart state and clear config"""
     logger.info(f"Dispatch restart bot task for {bot_id}")
-    stop_bot_task(bot_id)
-    sleep(3)
-    start_bot_task(bot_id)
+    redis_broker.set_should_restart(bot_id)
+    redis_broker.clear_config(bot_id)
 
 
-def stop_all_bots_task():
+def should_stop_bot_task(bot_id: str):
+    """Set bot to should_stop state and clear config"""
+    logger.info(f"Dispatch stop bot task for {bot_id}")
+    redis_broker.set_should_stop(bot_id)
+    redis_broker.clear_config(bot_id)
+
+
+def should_stop_all_bots_task():
+    """Set all running bots to should_stop state and clear config"""
     logger.info("Dispatch stop all bots task")
     all_running_bots = redis_broker.get_all_running_bots()
     for bot_id in all_running_bots:
-        stop_bot_task(bot_id)
+        should_stop_bot_task(bot_id)
 
 
-def start_all_bots_task():
+def should_start_all_bots_in_model_task():
     logger.info("Dispatch start all bots task")
     with get_flask_app().app_context():
-        all_db_bots = [bot.bot_id() for bot in BotModel.query.all()]
-        for bot_id in all_db_bots:
-            start_bot_task(bot_id)
+        all_db_bots = BotModel.query.all()
+        for bot in all_db_bots:
+            init_data = bot.to_init_config()
+            setup_data = bot.to_setup_agent_config()
+            if init_data and setup_data:
+                should_start_bot_task(bot.bot_id(), init_data, setup_data)
 
 
-def try_starting_bot_task(bot_id: str):
+def listen_bots_task(bot_id: str):
+    _try_stopping_bot_task(bot_id)
+    _try_starting_bot_task(bot_id)
+
+
+# Only for monitoring
+def _try_starting_bot_task(bot_id: str):
+    """Start and run bot if it is in should_start state"""
     from discord_agents.scheduler.worker import load_bot_from_redis
     from discord_agents.scheduler.worker import bot_manager
 
@@ -84,22 +85,21 @@ def try_starting_bot_task(bot_id: str):
         logger.info(f"Can start: {bot_id}")
         init_data, setup_data = load_bot_from_redis(bot_id)
         if init_data and setup_data:
-            bot_running_task(bot_id)
             bot = MyBot(init_data)
             bot.setup_my_agent(setup_data)
-            bot_manager.add_bot(bot_id, bot)
+            bot_manager.add_bot_and_run(bot.bot_id, bot)
 
 
-def try_stopping_bot_task(bot_id: str):
+def _try_stopping_bot_task(bot_id: str):
     from discord_agents.scheduler.worker import bot_manager
 
-    can_stop = redis_broker.lock_and_set_stopping_if_should_stop(bot_id)
-    if can_stop:
-        logger.info(f"Can stop: {bot_id}")
-        bot_idle_task(bot_id)
+    next_state = redis_broker.lock_and_set_stopping_if_should_stop(bot_id)
+    if next_state is not False:
         bot_manager.remove_bot(bot_id)
 
-
-def listen_bots_task(bot_id: str):
-    try_stopping_bot_task(bot_id)
-    try_starting_bot_task(bot_id)
+    if next_state == "to_idle":
+        logger.info(f"Can stop: {bot_id}")
+        bot_idle_task(bot_id)
+    elif next_state == "to_start":
+        logger.info(f"Can restart: {bot_id}")
+        should_start_bot_in_model_task(bot_id)

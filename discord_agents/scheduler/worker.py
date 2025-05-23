@@ -3,7 +3,6 @@ import threading
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig, MyBot
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.broker import BotRedisClient
-from discord_agents.scheduler.tasks import listen_bots_task
 
 logger = get_logger("worker")
 
@@ -23,7 +22,7 @@ class BotManager:
                     cls._instance._monitor_running = False
         return cls._instance
 
-    def add_bot(self, bot_id: str, my_bot: MyBot):
+    def add_bot_and_run(self, bot_id: str, my_bot: MyBot):
         if bot_id in self._bot_map:
             logger.warning(f"Bot {bot_id} already exists in manager.")
             return

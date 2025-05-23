@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     app = create_app()
 
-    from discord_agents.scheduler.tasks import start_all_bots_task
+    from discord_agents.scheduler.tasks import should_start_all_bots_in_model_task
 
-    start_all_bots_task()
+    should_start_all_bots_in_model_task()
     GunicornApp(app, options).run()

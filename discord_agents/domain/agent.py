@@ -14,6 +14,7 @@ class LLM_TYPE(Enum):
     GEMINI = "gemini"
     GPT = "gpt"
     GROK = "grok"
+    CLAUDE = "claude"
 
 
 class LLMs:
@@ -62,6 +63,16 @@ class LLMs:
             "model": "xai/grok-3",
             "agent": LLM_TYPE.GROK,
             "price_per_1M": 6.00,
+        },
+        {
+            "model": "claude-3-7-sonnet-latest",
+            "agent": LLM_TYPE.CLAUDE,
+            "price_per_1M": 8.50,
+        },
+        {
+            "model": "claude-3-5-haiku-latest",
+            "agent": LLM_TYPE.CLAUDE,
+            "price_per_1M": 2.40,
         },
     ]
 
