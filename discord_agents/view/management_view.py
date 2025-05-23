@@ -44,11 +44,11 @@ class BotManagementView(BaseView):
 
     @expose("/start/<bot_id>")
     def start_bot(self, bot_id):
-        from discord_agents.scheduler.tasks import start_bot_task
+        from discord_agents.scheduler.tasks import should_start_bot_in_model_task
 
         logger.info(f"Receive request to start bot {bot_id}")
         try:
-            start_bot_task(bot_id)
+            should_start_bot_in_model_task(bot_id)
             logger.info(f"Bot {bot_id} started successfully (task dispatched)")
             flash(f"Bot {bot_id} start task dispatched", "success")
             return redirect(url_for(".index"))
@@ -82,11 +82,11 @@ class BotManagementView(BaseView):
 
     @expose("/start-all")
     def start_all_bots(self):
-        from discord_agents.scheduler.tasks import start_all_bots_task
+        from discord_agents.scheduler.tasks import should_start_all_bots_in_model_task
 
         logger.info("Receive request to start all bots")
         try:
-            start_all_bots_task()
+            should_start_all_bots_in_model_task()
             logger.info("All bot start tasks dispatched")
             flash("All bot start tasks dispatched", "success")
             return redirect(url_for(".index"))
@@ -101,11 +101,11 @@ class BotManagementView(BaseView):
 
     @expose("/stop-all")
     def stop_all_bots(self):
-        from discord_agents.scheduler.tasks import stop_all_bots_task
+        from discord_agents.scheduler.tasks import should_stop_all_bots_task
 
         logger.info("Receive request to stop all bots")
         try:
-            stop_all_bots_task()
+            should_stop_all_bots_task()
             logger.info("All bot stop tasks dispatched")
             flash("All bot stop tasks dispatched", "success")
             return redirect(url_for(".index"))

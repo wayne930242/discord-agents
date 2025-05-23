@@ -9,7 +9,7 @@ import json
 from .management_view import BotManagementView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.tasks import restart_bot_task
+from discord_agents.scheduler.tasks import should_restart_bot_task
 from discord_agents.domain.agent import LLMs
 
 logger = get_logger("bot_view")
@@ -107,7 +107,7 @@ class BotAgentView(ModelView):
         try:
             bot_id = f"bot_{model.id}"
             db.session.commit()
-            restart_bot_task(bot_id)
+            should_restart_bot_task(bot_id)
             logger.info(
                 f"Bot {bot_id} settings have been updated and restarted successfully"
             )

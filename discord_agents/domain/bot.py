@@ -2,11 +2,13 @@ from discord.ext import commands
 import discord
 from typing import Optional
 import asyncio
+from result import Result, Ok, Err
 
 from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.domain.tools import Tools
+
 from discord_agents.env import (
     DATABASE_URL,
     DM_ID_WHITE_LIST,
@@ -22,36 +24,29 @@ class MyBot:
         self,
         config: MyBotInitConfig,
     ) -> None:
-        try:
-            logger.info("Starting MyBot initialization...")
-            self._token = self._validate_token(config["token"])
-            self._command_prefix = self._init_command_prefix(
-                config.get("command_prefix_param")
-            )
-            self._dm_whitelist = self._init_dm_whitelist(config.get("dm_whitelist"))
-            self._srv_whitelist = self._init_srv_whitelist(config.get("srv_whitelist"))
-            self._cog = None
-            intents = self._init_intents()
-            self._bot = self._init_bot(self._command_prefix, intents)
-            self._bot.on_ready = self._on_ready
-            self.bot_id = config["bot_id"]
-            try:
-                import asyncio
+        logger.info("Starting MyBot initialization...")
+        token_result = self._validate_token(config["token"])
+        if token_result.is_err():
+            raise ValueError(token_result.err())
+        self._token = token_result.ok()
+        self._command_prefix = self._init_command_prefix(
+            config.get("command_prefix_param")
+        )
+        self._dm_whitelist = self._init_dm_whitelist(config.get("dm_whitelist"))
+        self._srv_whitelist = self._init_srv_whitelist(config.get("srv_whitelist"))
+        self._cog = None
+        intents = self._init_intents()
+        self._bot = self._init_bot(self._command_prefix, intents)
+        self._bot.on_ready = self._on_ready
+        self.bot_id = config["bot_id"]
+        logger.info(
+            f"MyBot initialization completed for token ending with: ...{self._token[-4:] if len(self._token) > 4 else self._token}"
+        )
 
-                self.loop = asyncio.get_running_loop()
-            except RuntimeError:
-                self.loop = None
-            logger.info(
-                f"MyBot initialization completed for token ending with: ...{self._token[-4:] if len(self._token) > 4 else self._token}"
-            )
-        except Exception as e:
-            logger.error(f"Error during MyBot initialization: {str(e)}", exc_info=True)
-            raise
-
-    def _validate_token(self, token: str) -> str:
+    def _validate_token(self, token: str) -> Result[str, str]:
         if not token:
-            raise ValueError("Token cannot be empty")
-        return token
+            return Err("Token cannot be empty")
+        return Ok(token)
 
     def _init_command_prefix(self, command_prefix_param: Optional[str]) -> str:
         prefix = command_prefix_param or "="
@@ -97,15 +92,12 @@ class MyBot:
             help_command=None,
         )
 
-        logger.info("Bot instance created successfully")
-        return bot
-
     def setup_my_agent(
         self,
         config: MyAgentSetupConfig,
-    ) -> None:
+    ) -> Result[None, str]:
+        logger.info(f"Setting up agent for app: {config['app_name']}")
         try:
-            logger.info(f"Setting up agent for app: {config['app_name']}")
             agent = MyAgent(
                 name=config["app_name"],
                 description=config["description"],
@@ -114,7 +106,6 @@ class MyBot:
                 model_name=config["agent_model"],
                 tools=Tools.get_tools(config["tools"]),
             )
-
             self._cog = AgentCog(
                 bot=self._bot,
                 bot_id=self.bot_id,
@@ -127,38 +118,40 @@ class MyBot:
                 srv_whitelist=self._srv_whitelist,
             )
             logger.info("Agent setup completed successfully")
+            return Ok(None)
         except Exception as e:
             logger.error(f"Error during agent setup: {str(e)}", exc_info=True)
-            raise
+            return Err(str(e))
 
-    async def _on_ready(self) -> None:
-        try:
-            logger.info(f"Bot is ready. Logged in as {self._bot.user}")
-            if self._cog:
+    async def _on_ready(self) -> Result[None, str]:
+        logger.info(f"Bot is ready. Logged in as {self._bot.user}")
+        if self._cog:
+            try:
                 await self._bot.add_cog(self._cog)
                 logger.info(f"Cog added successfully: {self._cog}")
-        except Exception as e:
-            logger.error(f"Error in on_ready event: {str(e)}", exc_info=True)
+                return Ok(None)
+            except Exception as e:
+                logger.error(f"Error in on_ready event: {str(e)}", exc_info=True)
+                return Err(str(e))
+        return Ok(None)
 
-    async def run(self) -> None:
+    async def run(self) -> Result[None, str]:
+        logger.info("Starting bot...")
         try:
-            logger.info("Starting bot...")
-            import asyncio
-
-            if self.loop is None:
-                self.loop = asyncio.get_running_loop()
             await self._bot.start(self._token)
+            return Ok(None)
         except Exception as e:
             logger.error(f"Error running bot: {str(e)}", exc_info=True)
-            raise
+            return Err(str(e))
 
-    async def stop(self) -> None:
+    async def stop(self) -> Result[None, str]:
+        logger.info("Stopping bot...")
         try:
-            logger.info("Stopping bot...")
             await self._bot.close()
+            return Ok(None)
         except asyncio.CancelledError:
             logger.warning("Stop coroutine was cancelled inside MyBot.stop()")
-            return
+            return Err("CancelledError")
         except Exception as e:
             logger.error(f"Error stopping bot: {str(e)}", exc_info=True)
-            raise
+            return Err(str(e))

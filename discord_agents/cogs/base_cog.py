@@ -158,7 +158,6 @@ class AgentCog(commands.Cog):
     async def _on_message(self, message: discord.Message) -> None:
         result = self.parse_message_query(message)
         if result.is_err():
-            logger.debug(f"parse_message_query failed: {result.err()}")
             return
         query, user_adk_id = result.ok()
         if not query:
@@ -166,7 +165,9 @@ class AgentCog(commands.Cog):
             return
         session_result = await self._ensure_session(user_adk_id)
         if session_result.is_err():
-            logger.error(f"Failed to create session: {session_result.err()}", exc_info=True)
+            logger.error(
+                f"Failed to create session: {session_result.err()}", exc_info=True
+            )
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
@@ -179,7 +180,9 @@ class AgentCog(commands.Cog):
             message, runner, query, user_adk_id, session_id
         )
         if stream_result.is_err():
-            logger.error(f"process_agent_stream_responses failed: {stream_result.err()}")
+            logger.error(
+                f"process_agent_stream_responses failed: {stream_result.err()}"
+            )
 
     def check_clear_sessions_permission(
         self, ctx, target_user_id: Optional[str]
@@ -193,9 +196,7 @@ class AgentCog(commands.Cog):
     @commands.command(name="clear_sessions")
     async def clear_sessions(self, ctx, target_user_id: Optional[str] = None):
         if not self.check_clear_sessions_permission(ctx, target_user_id):
-            await ctx.send(
-                "You do not have permission to clear other users' sessions."
-            )
+            await ctx.send("You do not have permission to clear other users' sessions.")
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
