@@ -27,6 +27,7 @@ dependencies = [
     "litellm>=1.70.2",
     "flask-migrate>=4.1.0",
     "result>=0.17.0",
+    "tiktoken>=0.9.0",
 ]
 
 [build-system]

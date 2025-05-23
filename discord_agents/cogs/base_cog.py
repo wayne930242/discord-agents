@@ -77,6 +77,8 @@ class AgentCog(commands.Cog):
                 session_id=session_id,
                 use_function_map=self.USE_FUNCTION_MAP,
                 only_final=True,
+                model=getattr(self.agent, "model_name", None),
+                max_tokens=getattr(self.agent, "max_tokens", float("inf")),
             ):
                 try:
                     if isinstance(part_data, str):
