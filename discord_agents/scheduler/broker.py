@@ -1,10 +1,11 @@
 from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
-from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional, Literal
 import json
 from redlock import Redlock
+import time
 
 logger = get_logger("broker")
 
@@ -28,6 +29,7 @@ class BotRedisClient:
     }
     BOT_INIT_CONFIG_KEY = "bot:{bot_id}:init_config"
     BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
+    HISTORY_KEY = "history:{user_id}:{session_id}:{model}"
 
     def __new__(cls):
         if cls._instance is None:
@@ -203,3 +205,79 @@ class BotRedisClient:
     def clear_config(self, bot_id: str) -> None:
         self._client.delete(self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id))
         self._client.delete(self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id))
+
+    def add_message_history(
+        self,
+        user_id: str,
+        session_id: str,
+        model: str,
+        text: str,
+        tokens: int,
+        interval_seconds: float = 0.0,
+        timestamp: float = None,
+    ):
+        if interval_seconds == 0 or timestamp is None or timestamp == float("inf"):
+            return
+        expire_at = timestamp + interval_seconds if interval_seconds > 0 else None
+        key = self.HISTORY_KEY.format(
+            user_id=user_id, session_id=session_id, model=model
+        )
+        item = json.dumps(
+            {
+                "text": text,
+                "tokens": tokens,
+                "timestamp": timestamp,
+                "expire_at": expire_at,
+            }
+        )
+        try:
+            self._client.rpush(key, item)
+        except Exception as e:
+            logger.error(f"[Redis Error] add_message_history: {e}")
+
+    def get_message_history(
+        self, user_id: str, session_id: str, model: str
+    ) -> list[dict]:
+        self.prune_message_history(user_id, session_id, model)
+        key = self.HISTORY_KEY.format(
+            user_id=user_id, session_id=session_id, model=model
+        )
+        now = time.time()
+        result = []
+        try:
+            items = self._client.lrange(key, 0, -1)
+            for item in items:
+                try:
+                    data = json.loads(item)
+                    expire_at = data.get("expire_at")
+                    if not expire_at or expire_at > now:
+                        result.append(data)
+                except Exception as e:
+                    logger.warning(f"[History Parse Error] {e}")
+        except Exception as e:
+            logger.error(f"[Redis Error] get_message_history: {e}")
+        return result
+
+    def prune_message_history(self, user_id: str, session_id: str, model: str):
+        key = self.HISTORY_KEY.format(
+            user_id=user_id, session_id=session_id, model=model
+        )
+        now = time.time()
+        try:
+            items = self._client.lrange(key, 0, -1)
+            keep_indices = []
+            for idx, item in enumerate(items):
+                try:
+                    data = json.loads(item)
+                    expire_at = data.get("expire_at")
+                    if not expire_at or expire_at > now:
+                        keep_indices.append(idx)
+                except Exception as e:
+                    logger.warning(f"[History Parse Error] {e}")
+            if keep_indices:
+                first, last = keep_indices[0], keep_indices[-1]
+                self._client.ltrim(key, first, last)
+            else:
+                self._client.delete(key)
+        except Exception as e:
+            logger.error(f"[Redis Error] prune_message_history: {e}")

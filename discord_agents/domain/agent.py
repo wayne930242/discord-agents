@@ -8,6 +8,9 @@ from enum import Enum
 import pytz
 
 from discord_agents.domain.tools import Tools
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("agent")
 
 
 class LLM_TYPE(Enum):
@@ -23,73 +26,101 @@ class LLMs:
             "model": "gemini-2.5-flash-preview-04-17",
             "agent": LLM_TYPE.GEMINI,
             "price_per_1M": 0.26,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gemini-2.5-pro-preview-05-06",
             "agent": LLM_TYPE.GEMINI,
             "price_per_1M": 3.50,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 3.50,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1-nano",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.17,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1-mini",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.70,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4o",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 3.50,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4o-mini",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.26,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "xai/grok-3-mini",
             "agent": LLM_TYPE.GROK,
             "price_per_1M": 0.35,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "xai/grok-3",
             "agent": LLM_TYPE.GROK,
             "price_per_1M": 6.00,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "claude-sonnet-4-20250514",
             "agent": LLM_TYPE.CLAUDE,
             "price_per_1M": 8.50,
-            "max_tokens": 20000,
+            "restrictions": {
+                "max_tokens": 20000,
+                "interval_seconds": 60,
+                "key": "claude_sonnet_4_20250514",
+            },
         },
         {
             "model": "claude-3-7-sonnet-latest",
             "agent": LLM_TYPE.CLAUDE,
             "price_per_1M": 8.50,
-            "max_tokens": 20000,
+            "restrictions": {
+                "max_tokens": 20000,
+                "interval_seconds": 60,
+                "key": "claude_3_7_sonnet_latest",
+            },
         },
         {
             "model": "claude-3-5-haiku-latest",
             "agent": LLM_TYPE.CLAUDE,
             "price_per_1M": 2.40,
-            "max_tokens": float("inf"),
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
     ]
 
@@ -111,11 +142,14 @@ class LLMs:
         ]
 
     @staticmethod
-    def get_max_tokens(model_name: str) -> float:
+    def get_restrictions(model_name: str) -> tuple[int, int]:
         for llm in LLMs.llm_list:
             if llm["model"] == model_name:
-                return llm.get("max_tokens", float("inf"))
-        return float("inf")
+                restrictions = llm.get("restrictions", {})
+                return restrictions.get("max_tokens", float("inf")), restrictions.get(
+                    "interval_seconds", 0.0
+                )
+        return float("inf"), 0.0
 
 
 class MyAgent:
@@ -142,7 +176,10 @@ class MyAgent:
 
         self._llm_type = LLMs.find_model_type(model_name)
         self.model_name = model_name
-        self.max_tokens = LLMs.get_max_tokens(model_name)
+        self.max_tokens, self.interval_seconds = LLMs.get_restrictions(model_name)
+        logger.info(
+            f"Agent {self.name} initialized with model {model_name}, max_tokens {self.max_tokens}, interval_seconds {self.interval_seconds}"
+        )
 
         if self._llm_type == LLM_TYPE.GEMINI:
             self._agent_model = self.gemini_model()

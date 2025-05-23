@@ -2,8 +2,10 @@ from google.genai import types
 from google.adk.runners import Runner
 from typing import AsyncGenerator, Union, Optional
 import tiktoken
+import time
 
 from discord_agents.utils.logger import get_logger
+from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("call_agent")
 
@@ -48,28 +50,27 @@ async def call_agent_async(
     return final_response_text
 
 
-def count_tokens(text, model: Optional[str] = None):
-    if model is None:
+def count_tokens(text):
+    try:
+        enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        return len(enc.encode(text))
+    except Exception:
         return len(text)
-    enc = tiktoken.encoding_for_model(model)
-    return len(enc.encode(text))
 
 
 def trim_history(messages, max_tokens: int, model: Optional[str] = None):
     RESERVED_TOKENS = 100  # Reserved tokens to avoid token limit issues
     if max_tokens == float("inf") or model is None:
-        logger.info(
-            f"Token count (no limit): {sum(count_tokens(m, model) for m in messages)}"
-        )
+        logger.info(f"Token count (no limit): {sum(count_tokens(m) for m in messages)}")
         logger.debug(f"Trimmed messages (no limit): {messages}")
         return messages, False  # New flag
     total_tokens = 0
     trimmed = []
-    original_tokens = sum(count_tokens(m, model) for m in messages)
+    original_tokens = sum(count_tokens(m) for m in messages)
     logger.info(f"Token count (before trim): {original_tokens}")
     effective_max_tokens = max(0, max_tokens - RESERVED_TOKENS)
     for msg in reversed(messages):
-        msg_tokens = count_tokens(msg, model)
+        msg_tokens = count_tokens(msg)
         if total_tokens + msg_tokens > effective_max_tokens:
             break
         trimmed.append(msg)
@@ -89,40 +90,45 @@ async def stream_agent_responses(
     only_final: bool = True,
     model: Optional[str] = None,
     max_tokens: int = float("inf"),
+    interval_seconds: float = 0.0,
 ) -> AsyncGenerator[str, None]:
     try:
         logger.info(
             f"\n>>> User Query for user {user_id}, session {session_id}: {query}"
         )
 
-        if not query or not user_id or not session_id:
-            logger.error("Invalid input parameters")
+        if not query or not user_id or not session_id or not model:
+            logger.error(
+                f"Invalid input parameters: {query}, {user_id}, {session_id}, {model}"
+            )
             yield "⚠️ 輸入參數有誤，請確認後再試。"
             return
 
-        session_service = getattr(runner, "session_service", None)
-        app_name = getattr(runner, "app_name", None)
-        history = []
-        if session_service and app_name:
-            try:
-                session = session_service.get_session(
-                    app_name=app_name,
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-                if session and hasattr(session, "events"):
-                    history = [
-                        e.content["text"]
-                        for e in session.events
-                        if e.content and "text" in e.content
-                    ]
-            except Exception as e:
-                logger.warning(f"Failed to get session history: {e}")
-                history = []
+        broker_client = BotRedisClient()
+        try:
+            history_items = broker_client.get_message_history(
+                user_id, session_id, model
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get broker history: {e}")
+            history_items = []
+        history = [item["text"] for item in history_items]
+        total_tokens = sum(item.get("tokens", 0) for item in history_items)
+        query_tokens = count_tokens(query)
+        trimmed_flag = False
+        if total_tokens + query_tokens > max_tokens:
+            keep = []
+            running_tokens = query_tokens
+            for item in reversed(history_items):
+                t = item.get("tokens", 0)
+                if running_tokens + t > max_tokens:
+                    trimmed_flag = True
+                    break
+                keep.append(item["text"])
+                running_tokens += t
+            history = list(reversed(keep))
         messages = history + [query]
-        messages, trimmed_flag = trim_history(messages, max_tokens, model)
         prompt = "\n".join(messages)
-
         if trimmed_flag:
             yield "⚠️ 部分歷史訊息因 token 限制已被省略，回應可能不完整。"
 
@@ -206,6 +212,18 @@ async def stream_agent_responses(
                             final_text = (
                                 full_response_text + event.content.parts[0].text
                             ).strip()
+                            try:
+                                broker_client.add_message_history(
+                                    user_id,
+                                    session_id,
+                                    model,
+                                    query,
+                                    query_tokens,
+                                    interval_seconds,
+                                    time.time(),
+                                )
+                            except Exception as e:
+                                logger.warning(f"Failed to add broker history: {e}")
                             yield final_text
                             final_response_yielded = True
                             full_response_text = ""

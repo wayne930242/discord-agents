@@ -99,7 +99,7 @@ class MyBot:
     ) -> Result[None, str]:
         logger.info(f"Setting up agent for app: {config['app_name']}")
         try:
-            agent = MyAgent(
+            my_agent = MyAgent(
                 name=config["app_name"],
                 description=config["description"],
                 role_instructions=config["role_instructions"],
@@ -114,7 +114,7 @@ class MyBot:
                 db_url=DATABASE_URL,
                 use_function_map=config["use_function_map"],
                 error_message=config["error_message"],
-                agent=agent.get_agent(),
+                my_agent=my_agent,
                 dm_whitelist=self._dm_whitelist,
                 srv_whitelist=self._srv_whitelist,
             )

@@ -9,6 +9,7 @@ from google.adk.agents import Agent
 from typing import Optional
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
+from discord_agents.domain.agent import MyAgent
 
 logger = get_logger("base_cog")
 
@@ -21,7 +22,7 @@ class AgentCog(commands.Cog):
         app_name: str,
         db_url: str,
         error_message: str,
-        agent: Agent,
+        my_agent: MyAgent,
         use_function_map: Optional[dict[str, str]] = None,
         dm_whitelist: Optional[list[str]] = None,
         srv_whitelist: Optional[list[str]] = None,
@@ -36,7 +37,7 @@ class AgentCog(commands.Cog):
         self.bot_id = bot_id
         self.session_service = DatabaseSessionService(db_url)
         logger.info(f"Session Service initialized for app: {app_name}")
-        self.agent = agent
+        self.my_agent = my_agent
         logger.info(f"Agent initialized for app: {app_name}")
 
     def _get_user_adk_id(self, message: discord.Message) -> Result[str, str]:
@@ -77,8 +78,9 @@ class AgentCog(commands.Cog):
                 session_id=session_id,
                 use_function_map=self.USE_FUNCTION_MAP,
                 only_final=True,
-                model=getattr(self.agent, "model_name", None),
-                max_tokens=getattr(self.agent, "max_tokens", float("inf")),
+                model=self.my_agent.model_name,
+                max_tokens=self.my_agent.max_tokens,
+                interval_seconds=self.my_agent.interval_seconds,
             ):
                 try:
                     if isinstance(part_data, str):
@@ -173,18 +175,22 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
-        runner = Runner(
-            app_name=self.APP_NAME,
-            session_service=self.session_service,
-            agent=self.agent,
-        )
-        stream_result = await self.process_agent_stream_responses(
-            message, runner, query, user_adk_id, session_id
-        )
-        if stream_result.is_err():
-            logger.error(
-                f"process_agent_stream_responses failed: {stream_result.err()}"
+        try:
+            runner = Runner(
+                app_name=self.APP_NAME,
+                session_service=self.session_service,
+                agent=self.my_agent.get_agent(),
             )
+            stream_result = await self.process_agent_stream_responses(
+                message, runner, query, user_adk_id, session_id
+            )
+            if stream_result.is_err():
+                logger.error(
+                    f"process_agent_stream_responses failed: {stream_result.err()}"
+                )
+        except Exception as e:
+            logger.error(f"_on_message 發生例外: {e}", exc_info=True)
+            await message.channel.send(self.ERROR_MESSAGE)
 
     def check_clear_sessions_permission(
         self, ctx, target_user_id: Optional[str]

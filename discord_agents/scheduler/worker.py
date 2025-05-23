@@ -6,7 +6,6 @@ from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("worker")
 
-
 class BotManager:
     _instance = None
     _lock = threading.Lock()
