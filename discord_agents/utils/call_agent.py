@@ -96,8 +96,10 @@ async def stream_agent_responses(
         logger.info(
             f"\n>>> User Query for user {user_id}, session {session_id}: {query}"
         )
+        if not query:
+            return
 
-        if not query or not user_id or not session_id or not model:
+        if not user_id or not session_id or not model:
             logger.error(
                 f"Invalid input parameters: {query}, {user_id}, {session_id}, {model}"
             )
