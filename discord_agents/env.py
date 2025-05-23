@@ -33,8 +33,6 @@ REQUIRED_ENV_VARS: dict[str, Any] = {
     "GOOGLE_API_KEY": GOOGLE_API_KEY,
     "TAVILY_API_KEY": TAVILY_API_KEY,
     "REDIS_URL": REDIS_URL,
-    "XAI_API_KEY": XAI_API_KEY,
-    "OPENAI_API_KEY": OPENAI_API_KEY,
 }
 
 missing_vars: list[str] = []
