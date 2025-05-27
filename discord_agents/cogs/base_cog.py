@@ -14,6 +14,9 @@ logger = get_logger("base_cog")
 
 
 class AgentCog(commands.Cog):
+    USER_DM_TEMPLATE = "discord_user_dm_{user_id}"
+    CHANNEL_TEMPLATE = "discord_channel_{channel_id}"
+
     def __init__(
         self,
         bot: commands.Bot,
@@ -41,9 +44,9 @@ class AgentCog(commands.Cog):
 
     def _get_user_adk_id(self, message: discord.Message) -> Result[str, str]:
         if isinstance(message.channel, discord.DMChannel):
-            return Ok(f"discord_user_dm_{message.author.id}")
+            return Ok(AgentCog.USER_DM_TEMPLATE.format(user_id=message.author.id))
         elif isinstance(message.channel, discord.TextChannel):
-            return Ok(f"discord_channel_{message.channel.id}")
+            return Ok(AgentCog.CHANNEL_TEMPLATE.format(channel_id=message.channel.id))
         else:
             return Err(f"Unknown channel type for user {message.author.id}")
 
@@ -199,16 +202,16 @@ class AgentCog(commands.Cog):
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
-                user_adk_id = f"discord_channel_{target_user_id[8:]}"
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=target_user_id[8:])
             elif target_user_id.startswith("dm_"):
-                user_adk_id = f"discord_user_dm_{target_user_id[3:]}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id[3:])
             else:
-                user_adk_id = f"discord_user_dm_{target_user_id}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id)
         else:
             if isinstance(ctx.channel, discord.DMChannel):
-                user_adk_id = f"discord_user_dm_{ctx.author.id}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=ctx.author.id)
             elif isinstance(ctx.channel, discord.TextChannel):
-                user_adk_id = f"discord_channel_{ctx.channel.id}"
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=ctx.channel.id)
             else:
                 user_adk_id = f"discord_unknown_{ctx.author.id}"
         sessions_resp = self.session_service.list_sessions(
