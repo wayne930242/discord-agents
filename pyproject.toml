@@ -28,6 +28,8 @@ dependencies = [
     "flask-migrate>=4.1.0",
     "result>=0.17.0",
     "tiktoken>=0.9.0",
+    "crawl4ai>=0.6.3",
+    "playwright>=1.52.0",
 ]
 
 [build-system]

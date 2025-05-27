@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Playwright install
+playwright install
+
 # Db migrate
 flask db upgrade
 
