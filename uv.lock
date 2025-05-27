@@ -367,7 +367,7 @@ requires-dist = [
     { name = "flask-migrate", specifier = ">=4.1.0" },
     { name = "flask-sqlalchemy" },
     { name = "flask-wtf", specifier = ">=1.2.2" },
-    { name = "google-adk", specifier = ">=0.5.0" },
+    { name = "google-adk", extras = ["vertexai"], specifier = ">=0.5.0" },
     { name = "google-cloud-aiplatform" },
     { name = "google-genai" },
     { name = "gunicorn" },

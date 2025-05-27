@@ -174,6 +174,7 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
+
         runner = Runner(
             app_name=self.APP_NAME,
             session_service=self.session_service,
@@ -230,22 +231,19 @@ class AgentCog(commands.Cog):
 
     @commands.command(name="info")
     async def info_command(self, ctx):
-        from discord_agents.scheduler.worker import BotManager
-
-        try:
-            bot_manager = BotManager()
-            bot = bot_manager.get_bot(self.bot_id)
-            agent = bot.get_my_agent()
-            name, model, instructions, tools = agent.get_info()
-            await ctx.send(
-                f"**機器人名稱:** {name}\n"
-                f"**模型名稱:** {model}\n"
-                f"**提示詞:** ```{instructions}```\n"
-                f"{tools if tools else ''}```"
-            )
-        except Exception as e:
-            logger.error(f"Error in info_command: {e}", exc_info=True)
-            await ctx.send("Error in info_command")
+        tools = self.my_agent.tools
+        if isinstance(tools, list):
+            tools_str = "\n".join(str(t) for t in tools)
+        else:
+            tools_str = str(tools)
+        info_text = (
+            f"**機器人名稱:** {self.my_agent.name}\n"
+            f"**模型名稱:** {self.my_agent.model_name}\n"
+            f"**提示詞:** {self.my_agent.instructions}\n"
+            f"**工具:**\n{tools_str}"
+        )
+        for chunk in [info_text[i : i + 2000] for i in range(0, len(info_text), 2000)]:
+            await ctx.send(chunk)
 
     @commands.command(name="help")
     async def help_command(self, ctx):
