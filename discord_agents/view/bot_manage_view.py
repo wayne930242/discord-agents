@@ -3,10 +3,10 @@ from flask import flash, redirect, url_for, request
 from discord_agents.utils.logger import get_logger
 import json
 
-logger = get_logger("runner_view")
+logger = get_logger("bot_manage_view")
 
 
-class BotManagementView(BaseView):
+class BotManageView(BaseView):
     def __init__(self, name=None, endpoint=None, *args, **kwargs):
         super().__init__(name=name, endpoint=endpoint, *args, **kwargs)
         logger.info("BotManagementView initialized")
@@ -35,10 +35,10 @@ class BotManagementView(BaseView):
             else:
                 not_running_bots.append(bot_id)
         return self.render(
-            "admin/bot_management.html",
+            "admin/bot_manage.html",
             not_running_bots=not_running_bots,
             running_bots=running_bots,
-            title="Bot Management",
+            title="Bot Manage",
             error_message=error_message,
         )
 

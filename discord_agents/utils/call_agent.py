@@ -1,6 +1,8 @@
 from google.genai import types
 from google.adk.runners import Runner
-from typing import AsyncGenerator, Union, Optional
+from google.adk.events import Event
+from typing import AsyncGenerator, Optional
+from result import Result, Ok, Err
 import tiktoken
 import time
 
@@ -50,7 +52,7 @@ async def call_agent_async(
     return final_response_text
 
 
-def count_tokens(text):
+def count_tokens(text: str) -> int:
     try:
         enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
         return len(enc.encode(text))
@@ -58,7 +60,7 @@ def count_tokens(text):
         return len(text)
 
 
-def trim_history(messages, max_tokens: int, model: Optional[str] = None):
+def trim_history(messages: list[str], max_tokens: int, model: Optional[str] = None):
     RESERVED_TOKENS = 100  # Reserved tokens to avoid token limit issues
     if max_tokens == float("inf") or model is None:
         logger.info(f"Token count (no limit): {sum(count_tokens(m) for m in messages)}")
@@ -81,181 +83,170 @@ def trim_history(messages, max_tokens: int, model: Optional[str] = None):
     return trimmed_msgs, trimmed_flag
 
 
+def _get_history_and_prompt(
+    broker_client: BotRedisClient, model: str, query: str, max_tokens: int
+) -> Result[tuple[str, bool, int], str]:
+    try:
+        history_items = broker_client.get_message_history(model)
+    except Exception as e:
+        logger.warning(f"Failed to get broker history: {e}")
+        history_items = []
+    history = [item["text"] for item in history_items]
+    total_tokens = sum(item.get("tokens", 0) for item in history_items)
+    query_tokens = count_tokens(query)
+    trimmed_flag = False
+    if total_tokens + query_tokens > max_tokens:
+        keep = []
+        running_tokens = query_tokens
+        for item in reversed(history_items):
+            t = item.get("tokens", 0)
+            if running_tokens + t > max_tokens:
+                trimmed_flag = True
+                break
+            keep.append(item["text"])
+            running_tokens += t
+        history = list(reversed(keep))
+    messages = history + [query]
+    prompt = "\n".join(messages)
+    return Ok((prompt, trimmed_flag, query_tokens))
+
+
+def _handle_event(
+    event: Event, only_final: bool, full_response_text: str
+) -> tuple[bool, Optional[str], str, bool]:
+    try:
+        logger.debug(f"Event details: {event}")
+        logger.debug(f"Event type: {type(event).__name__}")
+        if event.content and event.content.parts:
+            for i, part in enumerate(event.content.parts):
+                logger.debug(f"Part {i} details:")
+                logger.debug(f"  Text: {part.text}")
+                logger.debug(f"  Function call: {part.function_call}")
+                logger.debug(f"  Function response: {part.function_response}")
+                logger.debug(f"  Raw part: {part}")
+
+        # Partial event
+        if (
+            getattr(event, "partial", False)
+            and event.content
+            and event.content.parts
+            and event.content.parts[0].text
+        ):
+            full_response_text += event.content.parts[0].text
+            if not only_final:
+                return True, event.content.parts[0].text, full_response_text, False
+            return True, None, full_response_text, False
+
+        # Function call
+        if hasattr(event, "get_function_calls") and event.get_function_calls():
+            if not only_final:
+                return True, "（......）", full_response_text, False
+        # Final event
+        if event.is_final_response():
+            logger.info(f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})")
+            if (
+                hasattr(event, "actions")
+                and event.actions
+                and hasattr(event.actions, "escalate")
+                and event.actions.escalate
+            ):
+                escalation_message = f"⚠️ 發生錯誤: {getattr(event, 'error_message', None) or '沒有特定訊息。'}"
+                return False, escalation_message, "", True
+            if event.content and event.content.parts:
+                final_text = (full_response_text + event.content.parts[0].text).strip()
+                return False, final_text, "", True
+            else:
+                return False, "⚠️ 未收到有效回應內容。", "", True
+
+        # Non-final event full content
+        if (
+            event.content
+            and event.content.parts
+            and not getattr(event, "partial", False)
+            and not event.is_final_response()
+        ):
+            for part in event.content.parts:
+                if part.text and not only_final:
+                    return True, part.text, full_response_text, False
+        return True, None, full_response_text, False
+
+    except Exception as event_error:
+        logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+        return True, None, full_response_text, False
+
+
+class MessageCenter:
+    INVALID_INPUT = "❌ 輸入參數有誤，請確認後再試。"
+    HISTORY_ERROR = lambda err: f"❌ 歷史訊息處理錯誤: {err}"
+    HISTORY_TRIMMED = "⚠️ 部分歷史訊息因 token 限制已被省略，回應可能不完整。"
+    CONTENT_ERROR = "❌ 建立訊息內容時發生錯誤，請稍後再試。"
+    EVENT_ERROR = lambda err: f"❌ 回應處理時發生錯誤: {err}"
+
+
 async def stream_agent_responses(
     query: str,
     runner: Runner,
     user_id: str,
     session_id: str,
-    use_function_map: Union[dict[str, str], None] = None,
     only_final: bool = True,
     model: Optional[str] = None,
     max_tokens: int = float("inf"),
     interval_seconds: float = 0.0,
-) -> AsyncGenerator[str, None]:
-    try:
-        logger.info(
-            f"\n>>> User Query for user {user_id}, session {session_id}: {query}"
-        )
-        if not query:
-            return
-
-        if not user_id or not session_id or not model:
-            logger.error(
-                f"Invalid input parameters: {query}, {user_id}, {session_id}, {model}"
-            )
-            yield "⚠️ 輸入參數有誤，請確認後再試。"
-            return
-
-        broker_client = BotRedisClient()
-        try:
-            history_items = broker_client.get_message_history(model)
-        except Exception as e:
-            logger.warning(f"Failed to get broker history: {e}")
-            history_items = []
-        history = [item["text"] for item in history_items]
-        total_tokens = sum(item.get("tokens", 0) for item in history_items)
-        query_tokens = count_tokens(query)
-        trimmed_flag = False
-        if total_tokens + query_tokens > max_tokens:
-            keep = []
-            running_tokens = query_tokens
-            for item in reversed(history_items):
-                t = item.get("tokens", 0)
-                if running_tokens + t > max_tokens:
-                    trimmed_flag = True
-                    break
-                keep.append(item["text"])
-                running_tokens += t
-            history = list(reversed(keep))
-        messages = history + [query]
-        prompt = "\n".join(messages)
-        if trimmed_flag:
-            yield "⚠️ 部分歷史訊息因 token 限制已被省略，回應可能不完整。"
-
-        try:
-            user_content = types.Content(role="user", parts=[types.Part(text=prompt)])
-        except Exception as content_error:
-            logger.error(f"Error creating content: {str(content_error)}", exc_info=True)
-            yield "⚠️ 建立訊息內容時發生錯誤，請稍後再試。"
-            return
-
-        full_response_text = ""
-        final_response_yielded = False
-
-        try:
-            async for event in runner.run_async(
-                user_id=user_id, session_id=session_id, new_message=user_content
-            ):
-                try:
-                    logger.debug(f"Event details: {event}")
-                    logger.debug(f"Event type: {type(event).__name__}")
-                    if event.content and event.content.parts:
-                        for i, part in enumerate(event.content.parts):
-                            logger.debug(f"Part {i} details:")
-                            logger.debug(f"  Text: {part.text}")
-                            logger.debug(f"  Function call: {part.function_call}")
-                            logger.debug(
-                                f"  Function response: {part.function_response}"
-                            )
-                            logger.debug(f"  Raw part: {part}")
-                    if not event:
-                        logger.warning("Received null event")
-                        continue
-                    # Handle partial event
-                    if (
-                        event.partial
-                        and event.content
-                        and event.content.parts
-                        and event.content.parts[0].text
-                    ):
-                        full_response_text += event.content.parts[0].text
-                        if not only_final:
-                            yield event.content.parts[0].text
-                        continue
-                    # Handle function call
-                    if event.get_function_calls():
-                        for call in event.get_function_calls():
-                            func_name = call.name
-                            if use_function_map and func_name in use_function_map:
-                                message_to_yield = (
-                                    "（" + use_function_map[func_name] + "）"
-                                )
-                                logger.info(
-                                    f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
-                                )
-                                if not only_final:
-                                    yield message_to_yield
-                            else:
-                                if not only_final:
-                                    yield "（......）"
-                    # Handle final event
-                    if event.is_final_response() and not final_response_yielded:
-                        logger.info(
-                            f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})"
-                        )
-                        if (
-                            hasattr(event, "actions")
-                            and event.actions
-                            and hasattr(event.actions, "escalate")
-                            and event.actions.escalate
-                        ):
-                            escalation_message = f"⚠️ *Agent escalated*: {event.error_message or 'No specific message.'}"
-                            if only_final:
-                                yield escalation_message
-                            else:
-                                yield escalation_message
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                        # Normal final response
-                        if event.content and event.content.parts:
-                            final_text = (
-                                full_response_text + event.content.parts[0].text
-                            ).strip()
-                            try:
-                                broker_client.add_message_history(
-                                    model=model,
-                                    text=query,
-                                    tokens=query_tokens,
-                                    interval_seconds=interval_seconds,
-                                    timestamp=time.time(),
-                                )
-                            except Exception as e:
-                                logger.warning(f"Failed to add broker history: {e}")
-                            yield final_text
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                        else:
-                            if only_final:
-                                yield "⚠️ 未收到有效回應內容。"
-                            else:
-                                yield "⚠️ 未收到有效回應內容。"
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                    # Non-final event full content
-                    if (
-                        event.content
-                        and event.content.parts
-                        and not event.partial
-                        and not event.is_final_response()
-                    ):
-                        for part in event.content.parts:
-                            if part.text and not only_final:
-                                yield part.text
-                except Exception as event_error:
-                    logger.error(
-                        f"Error processing event: {str(event_error)}", exc_info=True
-                    )
-                    continue
-        except Exception as stream_error:
-            logger.error(
-                f"Error in stream processing: {str(stream_error)}", exc_info=True
-            )
-            yield "⚠️ 回應處理時發生錯誤，請稍後再試。"
-    except Exception as e:
+) -> AsyncGenerator[Result[str, str], None]:
+    logger.info(f"\n>>> User Query for user {user_id}, session {session_id}: {query}")
+    if not query:
+        return
+    if not user_id or not session_id or not model:
         logger.error(
-            f"Unexpected error in stream_agent_responses: {str(e)}", exc_info=True
+            f"Invalid input parameters: {query}, {user_id}, {session_id}, {model}"
         )
-        yield "⚠️ 發生未知錯誤，請稍後再試。"
+        yield Err(MessageCenter.INVALID_INPUT)
+        return
+    broker_client = BotRedisClient()
+    prompt_result = _get_history_and_prompt(broker_client, model, query, max_tokens)
+    if prompt_result.is_err():
+        yield Err(MessageCenter.HISTORY_ERROR(prompt_result.err()))
+        return
+    prompt, trimmed_flag, query_tokens = prompt_result.ok()
+    if trimmed_flag:
+        yield Ok(MessageCenter.HISTORY_TRIMMED)
+    try_content = None
+    try:
+        try_content = types.Content(role="user", parts=[types.Part(text=prompt)])
+    except Exception as content_error:
+        logger.error(f"Error creating content: {str(content_error)}", exc_info=True)
+        yield Err(MessageCenter.CONTENT_ERROR)
+        return
+    user_content = try_content
+    full_response_text = ""
+    final_response_yielded = False
+    async for event in runner.run_async(
+        user_id=user_id, session_id=session_id, new_message=user_content
+    ):
+        try:
+            result = Ok(_handle_event(event, only_final, full_response_text))
+        except Exception as event_error:
+            logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+            result = Err(MessageCenter.EVENT_ERROR(str(event_error)))
+        if result.is_err():
+            yield result
+            continue
+        should_continue, yield_value, full_response_text, is_final = result.ok()
+        if yield_value is not None:
+            yield Ok(yield_value)
+        if is_final and not final_response_yielded:
+            try:
+                broker_client.add_message_history(
+                    model=model,
+                    text=query,
+                    tokens=query_tokens,
+                    interval_seconds=interval_seconds,
+                    timestamp=time.time(),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to add broker history: {e}")
+            final_response_yielded = True
+            full_response_text = ""
+            return
+        if not should_continue:
+            break

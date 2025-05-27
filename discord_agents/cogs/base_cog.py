@@ -70,23 +70,21 @@ class AgentCog(commands.Cog):
         session_id: str,
     ) -> Result[None, str]:
         try:
-            async for part_data in stream_agent_responses(
+            async for part_result in stream_agent_responses(
                 query=query,
                 runner=runner,
                 user_id=user_adk_id,
                 session_id=session_id,
-                use_function_map=self.USE_FUNCTION_MAP,
                 only_final=True,
                 model=self.my_agent.model_name,
                 max_tokens=self.my_agent.max_tokens,
                 interval_seconds=self.my_agent.interval_seconds,
             ):
                 try:
-                    if isinstance(part_data, str):
-                        part_content = part_data
-                    else:
-                        part_content = part_data.get("message", "")
-
+                    if part_result.is_err():
+                        await message.channel.send(part_result.err())
+                        return Err(part_result.err())
+                    part_content = part_result.ok()
                     cleaned_content = part_content.replace(
                         "<start_of_audio>", ""
                     ).replace("<end_of_audio>", "")
@@ -200,7 +198,7 @@ class AgentCog(commands.Cog):
     @commands.command(name="clear_sessions")
     async def clear_sessions(self, ctx, target_user_id: Optional[str] = None):
         if not self.check_clear_sessions_permission(ctx, target_user_id):
-            await ctx.send("You do not have permission to clear other users' sessions.")
+            await ctx.send("你沒有權限清除其他人的對話紀錄。")
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
@@ -221,13 +219,13 @@ class AgentCog(commands.Cog):
         )
         session_list = getattr(sessions_resp, "sessions", [])
         if not session_list:
-            await ctx.send("No sessions found.")
+            await ctx.send("未找到對話紀錄。")
             return
         for session in session_list:
             self.session_service.delete_session(
                 app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
             )
-        await ctx.send(f"Cleared {len(session_list)} sessions.")
+        await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
 
     @commands.command(name="info")
     async def info_command(self, ctx):

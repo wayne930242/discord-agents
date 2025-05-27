@@ -1,5 +1,4 @@
 from google.adk.agents import Agent
-from google.adk.tools.base_tool import BaseTool
 from google.adk.models.lite_llm import LiteLlm
 
 from datetime import datetime

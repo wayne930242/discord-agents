@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
-from .management_view import BotManagementView
+from .bot_manage_view import BotManageView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.tasks import should_restart_bot_task
@@ -22,7 +22,7 @@ def validate_json(form, field):
         raise ValidationError(f"Invalid JSON format: {str(e)}")
 
 
-class BotAgentForm(FlaskForm):
+class BotConfigForm(FlaskForm):
     # Bot fields
     token = StringField("Bot Token", validators=[DataRequired()])
     error_message = TextAreaField("Error Message", validators=[DataRequired()])
@@ -52,8 +52,8 @@ class BotAgentForm(FlaskForm):
     )
 
 
-class BotAgentView(ModelView):
-    form = BotAgentForm
+class BotConfigView(ModelView):
+    form = BotConfigForm
     column_list = ["id", "token", "command_prefix", "agent"]
     column_formatters = {
         "agent": lambda v, c, m, p: (m.agent.name if m.agent else "No Agent"),
@@ -129,10 +129,3 @@ class BotAgentView(ModelView):
             form.dm_whitelist.data = json.dumps(bot.dm_whitelist)
             form.srv_whitelist.data = json.dumps(bot.srv_whitelist)
             form.use_function_map.data = json.dumps(bot.use_function_map)
-
-
-def init_admin(app: Flask) -> Admin:
-    admin = Admin(app, name="Discord Agents Admin", template_mode="bootstrap3")
-    admin.add_view(BotAgentView(BotModel, db.session))
-    admin.add_view(BotManagementView(name="Runner", endpoint="botmanagement"))
-    return admin

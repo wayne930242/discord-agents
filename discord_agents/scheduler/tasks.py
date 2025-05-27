@@ -10,6 +10,11 @@ logger = get_logger("tasks")
 redis_broker = BotRedisClient()
 
 
+def bot_run_task(bot_id: str):
+    logger.info(f"Dispatch bot run task for {bot_id}")
+    redis_broker.set_running(bot_id)
+
+
 def bot_idle_task(bot_id: str):
     logger.info(f"Dispatch bot idle task for {bot_id}")
     redis_broker.set_idle(bot_id)
@@ -88,6 +93,7 @@ def _try_starting_bot_task(bot_id: str):
             bot = MyBot(init_data)
             bot.setup_my_agent(setup_data)
             bot_manager.add_bot_and_run(bot.bot_id, bot)
+            bot_run_task(bot.bot_id)
 
 
 def _try_stopping_bot_task(bot_id: str):

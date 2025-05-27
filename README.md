@@ -4,11 +4,11 @@ A Discord bot powered by Google's Generative AI, built with Python and Flask.
 
 ## Features
 
-- Discord bot integration with Google's Generative AI
-- Flask-based web interface for administration
-- PostgreSQL database support
-- Docker containerization
-- Custom bot management system with thread-based scheduling
+- Support multiple Discord bots
+- Google's Generative AI with DB session support
+- A web GUI for administration
+- PostgreSQL database for storing bot configurations
+- Custom bot management system with thread-based scheduling with Redis
 
 ## Prerequisites
 
@@ -64,3 +64,7 @@ docker build -t discord-agents .
 ```bash
 docker run -p 8080:8080 discord-agents
 ```
+
+## Dashboard
+
+Just visit the port 8080 (or the port you set), and you will see the dashboard.

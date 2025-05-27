@@ -4,8 +4,8 @@ from flask_admin import Admin
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
 from discord_agents.models.bot import db, BotModel
-from discord_agents.view.bot_view import BotAgentView
-from discord_agents.view.management_view import BotManagementView
+from discord_agents.view.bot_config_view import BotConfigView
+from discord_agents.view.bot_manage_view import BotManageView
 from discord_agents.utils.auth import requires_auth
 from discord_agents.scheduler.worker import bot_manager
 
@@ -22,8 +22,8 @@ def init_db(app: Flask):
 def init_admin(app: Flask):
     logger.info("Initializing admin interface...")
     admin = Admin(app, name="Discord Agents", template_mode="bootstrap4")
-    admin.add_view(BotAgentView(BotModel, db.session))
-    admin.add_view(BotManagementView(name="Runner", endpoint="botmanagementview"))
+    admin.add_view(BotConfigView(BotModel, db.session))
+    admin.add_view(BotManageView(name="Bot Manage", endpoint="botmanageview"))
     logger.info("Admin interface initialized")
 
 

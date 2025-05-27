@@ -19,10 +19,10 @@
                 <div class="panel-body">
                     <div class="row">
                         <div class="col-md-12">
-                            <a href="{{ url_for('botmanagementview.start_all_bots') }}" class="btn btn-success">
+                            <a href="{{ url_for('botmanageview.start_all_bots') }}" class="btn btn-success">
                                 <i class="fa fa-play"></i> Start All Bots
                             </a>
-                            <a href="{{ url_for('botmanagementview.stop_all_bots') }}" class="btn btn-danger">
+                            <a href="{{ url_for('botmanageview.stop_all_bots') }}" class="btn btn-danger">
                                 <i class="fa fa-stop"></i> Stop All Bots
                             </a>
                         </div>
@@ -48,7 +48,7 @@
                                     <h4 class="list-group-item-heading">{{ bot_id }}</h4>
                                 </div>
                                 <div class="col-md-4 text-right">
-                                    <a href="{{ url_for('botmanagementview.start_bot', bot_id=bot_id) }}"
+                                    <a href="{{ url_for('botmanageview.start_bot', bot_id=bot_id) }}"
                                         class="btn btn-success btn-sm">
                                         <i class="fa fa-play"></i> Start
                                     </a>
@@ -81,7 +81,7 @@
                                     <h4 class="list-group-item-heading">{{ bot_id }}</h4>
                                 </div>
                                 <div class="col-md-4 text-right">
-                                    <a href="{{ url_for('botmanagementview.stop_bot', bot_id=bot_id) }}"
+                                    <a href="{{ url_for('botmanageview.stop_bot', bot_id=bot_id) }}"
                                         class="btn btn-danger btn-sm">
                                         <i class="fa fa-stop"></i> Stop
                                     </a>

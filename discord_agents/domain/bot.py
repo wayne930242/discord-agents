@@ -4,7 +4,7 @@ from typing import Optional
 import asyncio
 from result import Result, Ok, Err
 
-from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.bot_config import MyBotInitConfig, MyAgentSetupConfig
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.domain.tools import Tools
