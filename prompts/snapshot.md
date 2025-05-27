@@ -13,7 +13,7 @@ discord_agents
 │   ├── __init__.py
 │   ├── agent.py
 │   ├── bot.py
-│   ├── config.py
+│   ├── bot_config.py
 │   ├── tool_def
 │   │   ├── __init__.py
 │   │   ├── life_env_tool.py
@@ -38,8 +38,8 @@ discord_agents
 │   └── logger.py
 └── view
     ├── __init__.py
-    ├── bot_view.py
-    └── management_view.py
+    ├── bot_config_view.py
+    └── bot_manage_view.py
 
 ```
 
@@ -52,8 +52,8 @@ from flask_admin import Admin
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
 from discord_agents.models.bot import db, BotModel
-from discord_agents.view.bot_view import BotAgentView
-from discord_agents.view.management_view import BotManagementView
+from discord_agents.view.bot_config_view import BotConfigView
+from discord_agents.view.bot_manage_view import BotManageView
 from discord_agents.utils.auth import requires_auth
 from discord_agents.scheduler.worker import bot_manager
 
@@ -70,8 +70,8 @@ def init_db(app: Flask):
 def init_admin(app: Flask):
     logger.info("Initializing admin interface...")
     admin = Admin(app, name="Discord Agents", template_mode="bootstrap4")
-    admin.add_view(BotAgentView(BotModel, db.session))
-    admin.add_view(BotManagementView(name="Runner", endpoint="botmanagementview"))
+    admin.add_view(BotConfigView(BotModel, db.session))
+    admin.add_view(BotManageView(name="Bot Manage", endpoint="botmanageview"))
     logger.info("Admin interface initialized")
 
 
@@ -126,10 +126,10 @@ from result import Result, Ok, Err
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from google.adk.agents import Agent
 from typing import Optional
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
+from discord_agents.domain.agent import MyAgent
 
 logger = get_logger("base_cog")
 
@@ -142,7 +142,7 @@ class AgentCog(commands.Cog):
         app_name: str,
         db_url: str,
         error_message: str,
-        agent: Agent,
+        my_agent: MyAgent,
         use_function_map: Optional[dict[str, str]] = None,
         dm_whitelist: Optional[list[str]] = None,
         srv_whitelist: Optional[list[str]] = None,
@@ -157,7 +157,7 @@ class AgentCog(commands.Cog):
         self.bot_id = bot_id
         self.session_service = DatabaseSessionService(db_url)
         logger.info(f"Session Service initialized for app: {app_name}")
-        self.agent = agent
+        self.my_agent = my_agent
         logger.info(f"Agent initialized for app: {app_name}")
 
     def _get_user_adk_id(self, message: discord.Message) -> Result[str, str]:
@@ -191,20 +191,21 @@ class AgentCog(commands.Cog):
         session_id: str,
     ) -> Result[None, str]:
         try:
-            async for part_data in stream_agent_responses(
+            async for part_result in stream_agent_responses(
                 query=query,
                 runner=runner,
                 user_id=user_adk_id,
                 session_id=session_id,
-                use_function_map=self.USE_FUNCTION_MAP,
                 only_final=True,
+                model=self.my_agent.model_name,
+                max_tokens=self.my_agent.max_tokens,
+                interval_seconds=self.my_agent.interval_seconds,
             ):
                 try:
-                    if isinstance(part_data, str):
-                        part_content = part_data
-                    else:
-                        part_content = part_data.get("message", "")
-
+                    if part_result.is_err():
+                        await message.channel.send(part_result.err())
+                        return Err(part_result.err())
+                    part_content = part_result.ok()
                     cleaned_content = part_content.replace(
                         "<start_of_audio>", ""
                     ).replace("<end_of_audio>", "")
@@ -292,10 +293,11 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
+
         runner = Runner(
             app_name=self.APP_NAME,
             session_service=self.session_service,
-            agent=self.agent,
+            agent=self.my_agent.get_agent(),
         )
         stream_result = await self.process_agent_stream_responses(
             message, runner, query, user_adk_id, session_id
@@ -317,7 +319,7 @@ class AgentCog(commands.Cog):
     @commands.command(name="clear_sessions")
     async def clear_sessions(self, ctx, target_user_id: Optional[str] = None):
         if not self.check_clear_sessions_permission(ctx, target_user_id):
-            await ctx.send("You do not have permission to clear other users' sessions.")
+            await ctx.send("你沒有權限清除其他人的對話紀錄。")
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
@@ -338,13 +340,29 @@ class AgentCog(commands.Cog):
         )
         session_list = getattr(sessions_resp, "sessions", [])
         if not session_list:
-            await ctx.send("No sessions found.")
+            await ctx.send("未找到對話紀錄。")
             return
         for session in session_list:
             self.session_service.delete_session(
                 app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
             )
-        await ctx.send(f"Cleared {len(session_list)} sessions.")
+        await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
+
+    @commands.command(name="info")
+    async def info_command(self, ctx):
+        tools = self.my_agent.tools
+        if isinstance(tools, list):
+            tools_str = "\n".join(str(t) for t in tools)
+        else:
+            tools_str = str(tools)
+        info_text = (
+            f"**機器人名稱:** {self.my_agent.name}\n"
+            f"**模型名稱:** {self.my_agent.model_name}\n"
+            f"**提示詞:** {self.my_agent.instructions}\n"
+            f"**工具:**\n{tools_str}"
+        )
+        for chunk in [info_text[i : i + 2000] for i in range(0, len(info_text), 2000)]:
+            await ctx.send(chunk)
 
     @commands.command(name="help")
     async def help_command(self, ctx):
@@ -355,6 +373,7 @@ class AgentCog(commands.Cog):
             "  - 在 DM 執行會清除自己的 session。\n"
             "  - 在頻道執行會清除該頻道的 session（需管理員權限可指定 target_id）。\n"
             "  - target_id 可為 `channel_<channel_id>` 或 `dm_<user_id>`，不填則預設為當前。\n"
+            f"`{self.bot.command_prefix}info` - 顯示機器人資訊\n"
         )
         await ctx.send(help_text)
 
@@ -364,7 +383,6 @@ class AgentCog(commands.Cog):
 
 ```py
 from google.adk.agents import Agent
-from google.adk.tools.base_tool import BaseTool
 from google.adk.models.lite_llm import LiteLlm
 
 from datetime import datetime
@@ -373,6 +391,9 @@ from enum import Enum
 import pytz
 
 from discord_agents.domain.tools import Tools
+from discord_agents.utils.logger import get_logger
+
+logger = get_logger("agent")
 
 
 class LLM_TYPE(Enum):
@@ -388,56 +409,101 @@ class LLMs:
             "model": "gemini-2.5-flash-preview-04-17",
             "agent": LLM_TYPE.GEMINI,
             "price_per_1M": 0.26,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gemini-2.5-pro-preview-05-06",
             "agent": LLM_TYPE.GEMINI,
             "price_per_1M": 3.50,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 3.50,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1-nano",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.17,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4.1-mini",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.70,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4o",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 3.50,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "gpt-4o-mini",
             "agent": LLM_TYPE.GPT,
             "price_per_1M": 0.26,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "xai/grok-3-mini",
             "agent": LLM_TYPE.GROK,
             "price_per_1M": 0.35,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
         {
             "model": "xai/grok-3",
             "agent": LLM_TYPE.GROK,
             "price_per_1M": 6.00,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
+        },
+        {
+            "model": "claude-sonnet-4-20250514",
+            "agent": LLM_TYPE.CLAUDE,
+            "price_per_1M": 8.50,
+            "restrictions": {
+                "max_tokens": 20000,
+                "interval_seconds": 60,
+                "key": "claude_sonnet_4_20250514",
+            },
         },
         {
             "model": "claude-3-7-sonnet-latest",
             "agent": LLM_TYPE.CLAUDE,
             "price_per_1M": 8.50,
+            "restrictions": {
+                "max_tokens": 20000,
+                "interval_seconds": 60,
+                "key": "claude_3_7_sonnet_latest",
+            },
         },
         {
             "model": "claude-3-5-haiku-latest",
             "agent": LLM_TYPE.CLAUDE,
             "price_per_1M": 2.40,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
         },
     ]
 
@@ -458,6 +524,16 @@ class LLMs:
             llm["model"] for llm in LLMs.llm_list if llm["price_per_1M"] < max_price
         ]
 
+    @staticmethod
+    def get_restrictions(model_name: str) -> tuple[int, int]:
+        for llm in LLMs.llm_list:
+            if llm["model"] == model_name:
+                restrictions = llm.get("restrictions", {})
+                return restrictions.get("max_tokens", float("inf")), restrictions.get(
+                    "interval_seconds", 0.0
+                )
+        return float("inf"), 0.0
+
 
 class MyAgent:
     """A custom agent implementation that wraps Google ADK Agent functionality."""
@@ -469,7 +545,7 @@ class MyAgent:
         role_instructions: str,
         tool_instructions: str,
         model_name: str,
-        tools: Optional[Union[list[str], list[BaseTool]]] = None,
+        tools: Optional[Union[list[str]]] = None,
     ):
         if tools is None:
             tools = []
@@ -477,12 +553,18 @@ class MyAgent:
         self.description = description
         self.instructions = f"{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
         if tools and all(isinstance(t, str) for t in tools):
+            self.tool_names = tools
             self.tools = Tools.get_tools(tools)
         else:
+            self.tool_names = []
             self.tools = tools or []
 
         self._llm_type = LLMs.find_model_type(model_name)
         self.model_name = model_name
+        self.max_tokens, self.interval_seconds = LLMs.get_restrictions(model_name)
+        logger.info(
+            f"Agent {self.name} initialized with model {model_name}, max_tokens {self.max_tokens}, interval_seconds {self.interval_seconds}"
+        )
 
         if self._llm_type == LLM_TYPE.GEMINI:
             self._agent_model = self.gemini_model()
@@ -508,6 +590,14 @@ class MyAgent:
     def lite_model(self):
         return LiteLlm(model=self.model_name)
 
+    def get_info(self) -> tuple[str, str, str, str]:
+        return (
+            self.name,
+            self.model_name,
+            self.instructions,
+            "\n".join(self.tool_names),
+        )
+
     @staticmethod
     def get_time_instructions():
         timezone = pytz.timezone("Asia/Taipei")
@@ -526,7 +616,7 @@ from typing import Optional
 import asyncio
 from result import Result, Ok, Err
 
-from discord_agents.domain.config import MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.bot_config import MyBotInitConfig, MyAgentSetupConfig
 from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.domain.tools import Tools
@@ -621,7 +711,7 @@ class MyBot:
     ) -> Result[None, str]:
         logger.info(f"Setting up agent for app: {config['app_name']}")
         try:
-            agent = MyAgent(
+            my_agent = MyAgent(
                 name=config["app_name"],
                 description=config["description"],
                 role_instructions=config["role_instructions"],
@@ -636,7 +726,7 @@ class MyBot:
                 db_url=DATABASE_URL,
                 use_function_map=config["use_function_map"],
                 error_message=config["error_message"],
-                agent=agent.get_agent(),
+                my_agent=my_agent,
                 dm_whitelist=self._dm_whitelist,
                 srv_whitelist=self._srv_whitelist,
             )
@@ -679,9 +769,12 @@ class MyBot:
             logger.error(f"Error stopping bot: {str(e)}", exc_info=True)
             return Err(str(e))
 
+    def get_my_agent(self) -> MyAgent:
+        return self._cog.my_agent
+
 ```
 
-`discord_agents/domain/config.py`:
+`discord_agents/domain/bot_config.py`:
 
 ```py
 from typing import TypedDict, Optional
@@ -850,14 +943,14 @@ search_tool = AgentTool(agent=search_agent)
 `discord_agents/domain/tools.py`:
 
 ```py
-from google.adk.tools.agent_tool import AgentTool
+from google.adk.tools.base_tool import BaseTool
 from discord_agents.domain.tool_def.search_tool import search_tool
 from discord_agents.domain.tool_def.life_env_tool import life_env_tool
 from discord_agents.domain.tool_def.rpg_dice_tool import rpg_dice_tool
 from typing import Optional
 
 
-TOOLS_DICT: dict[str, AgentTool] = {
+TOOLS_DICT: dict[str, BaseTool] = {
     "search": search_tool,
     "life_env": life_env_tool,
     "rpg_dice": rpg_dice_tool,
@@ -866,11 +959,11 @@ TOOLS_DICT: dict[str, AgentTool] = {
 
 class Tools:
     @classmethod
-    def get_tool(cls, name: str) -> AgentTool:
+    def get_tool(cls, name: str) -> BaseTool:
         return TOOLS_DICT[name]
 
     @classmethod
-    def get_tools(cls, names: Optional[list[str]] = None) -> list[AgentTool]:
+    def get_tools(cls, names: Optional[list[str]] = None) -> list[BaseTool]:
         if names is None:
             return list(TOOLS_DICT.values())
         return [TOOLS_DICT[name] for name in names]
@@ -1071,10 +1164,11 @@ class BotModel(db.Model):
 from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
-from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
+from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional, Literal
 import json
 from redlock import Redlock
+import time
 
 logger = get_logger("broker")
 
@@ -1098,6 +1192,7 @@ class BotRedisClient:
     }
     BOT_INIT_CONFIG_KEY = "bot:{bot_id}:init_config"
     BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
+    HISTORY_KEY = "history:{model}"
 
     def __new__(cls):
         if cls._instance is None:
@@ -1274,6 +1369,72 @@ class BotRedisClient:
         self._client.delete(self.BOT_INIT_CONFIG_KEY.format(bot_id=bot_id))
         self._client.delete(self.BOT_SETUP_CONFIG_KEY.format(bot_id=bot_id))
 
+    def add_message_history(
+        self,
+        model: str,
+        text: str,
+        tokens: int,
+        interval_seconds: float = 0.0,
+        timestamp: float = None,
+    ):
+        if interval_seconds == 0 or timestamp is None or timestamp == float("inf"):
+            return
+        expire_at = timestamp + interval_seconds if interval_seconds > 0 else None
+        key = self.HISTORY_KEY.format(model=model)
+        item = json.dumps(
+            {
+                "text": text,
+                "tokens": tokens,
+                "timestamp": timestamp,
+                "expire_at": expire_at,
+            }
+        )
+        try:
+            self._client.rpush(key, item)
+        except Exception as e:
+            logger.error(f"[Redis Error] add_message_history: {e}")
+
+    def get_message_history(self, model: str) -> list[dict]:
+        self.prune_message_history(model)
+        key = self.HISTORY_KEY.format(model=model)
+        now = time.time()
+        result = []
+        try:
+            items = self._client.lrange(key, 0, -1)
+            for item in items:
+                try:
+                    data = json.loads(item)
+                    expire_at = data.get("expire_at")
+                    if not expire_at or expire_at > now:
+                        result.append(data)
+                except Exception as e:
+                    logger.warning(f"[History Parse Error] {e}")
+        except Exception as e:
+            logger.error(f"[Redis Error] get_message_history: {e}")
+        return result
+
+    def prune_message_history(self, model: str):
+        key = self.HISTORY_KEY.format(model=model)
+        now = time.time()
+        try:
+            items = self._client.lrange(key, 0, -1)
+            keep_indices = []
+            for idx, item in enumerate(items):
+                try:
+                    data = json.loads(item)
+                    expire_at = data.get("expire_at")
+                    if not expire_at or expire_at > now:
+                        keep_indices.append(idx)
+                except Exception as e:
+                    logger.warning(f"[History Parse Error] {e}")
+            if keep_indices:
+                first, last = keep_indices[0], keep_indices[-1]
+                self._client.ltrim(key, first, last)
+            else:
+                self._client.delete(key)
+        except Exception as e:
+            logger.error(f"[Redis Error] prune_message_history: {e}")
+
 ```
 
 `discord_agents/scheduler/helpers.py`:
@@ -1307,6 +1468,11 @@ from discord_agents.scheduler.helpers import get_flask_app
 
 logger = get_logger("tasks")
 redis_broker = BotRedisClient()
+
+
+def bot_run_task(bot_id: str):
+    logger.info(f"Dispatch bot run task for {bot_id}")
+    redis_broker.set_running(bot_id)
 
 
 def bot_idle_task(bot_id: str):
@@ -1387,6 +1553,7 @@ def _try_starting_bot_task(bot_id: str):
             bot = MyBot(init_data)
             bot.setup_my_agent(setup_data)
             bot_manager.add_bot_and_run(bot.bot_id, bot)
+            bot_run_task(bot.bot_id)
 
 
 def _try_stopping_bot_task(bot_id: str):
@@ -1415,7 +1582,6 @@ from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("worker")
-
 
 class BotManager:
     _instance = None
@@ -1535,11 +1701,14 @@ def load_bot_from_redis(bot_id: str) -> tuple[MyBotInitConfig, MyAgentSetupConfi
 from flask import Response, request
 from functools import wraps
 from discord_agents.env import ADMIN_USERNAME, ADMIN_PASSWORD
+from typing import Callable
 
-def check_auth(username, password):
+
+def check_auth(username: str, password: str) -> bool:
     return username == ADMIN_USERNAME and password == ADMIN_PASSWORD
 
-def authenticate():
+
+def authenticate() -> Response:
     return Response(
         "Could not verify your access level for that URL.\n"
         "You have to login with proper credentials",
@@ -1547,14 +1716,16 @@ def authenticate():
         {"WWW-Authenticate": 'Basic realm="Login Required"'},
     )
 
-def requires_auth(f):
+
+def requires_auth(f: Callable) -> Callable:
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
             return authenticate()
         return f(*args, **kwargs)
-    return decorated 
+
+    return decorated
 
 ```
 
@@ -1563,9 +1734,14 @@ def requires_auth(f):
 ```py
 from google.genai import types
 from google.adk.runners import Runner
-from typing import AsyncGenerator, Union
+from google.adk.events import Event
+from typing import AsyncGenerator, Optional
+from result import Result, Ok, Err
+import tiktoken
+import time
 
 from discord_agents.utils.logger import get_logger
+from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("call_agent")
 
@@ -1610,125 +1786,204 @@ async def call_agent_async(
     return final_response_text
 
 
+def count_tokens(text: str) -> int:
+    try:
+        enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        return len(enc.encode(text))
+    except Exception:
+        return len(text)
+
+
+def trim_history(messages: list[str], max_tokens: int, model: Optional[str] = None):
+    RESERVED_TOKENS = 100  # Reserved tokens to avoid token limit issues
+    if max_tokens == float("inf") or model is None:
+        logger.info(f"Token count (no limit): {sum(count_tokens(m) for m in messages)}")
+        logger.debug(f"Trimmed messages (no limit): {messages}")
+        return messages, False  # New flag
+    total_tokens = 0
+    trimmed = []
+    original_tokens = sum(count_tokens(m) for m in messages)
+    logger.info(f"Token count (before trim): {original_tokens}")
+    effective_max_tokens = max(0, max_tokens - RESERVED_TOKENS)
+    for msg in reversed(messages):
+        msg_tokens = count_tokens(msg)
+        if total_tokens + msg_tokens > effective_max_tokens:
+            break
+        trimmed.append(msg)
+        total_tokens += msg_tokens
+    trimmed_msgs = list(reversed(trimmed))
+    logger.debug(f"Trimmed messages: {trimmed_msgs}")
+    trimmed_flag = len(trimmed_msgs) < len(messages)
+    return trimmed_msgs, trimmed_flag
+
+
+def _get_history_and_prompt(
+    broker_client: BotRedisClient, model: str, query: str, max_tokens: int
+) -> Result[tuple[str, bool, int], str]:
+    try:
+        history_items = broker_client.get_message_history(model)
+    except Exception as e:
+        logger.warning(f"Failed to get broker history: {e}")
+        history_items = []
+    history = [item["text"] for item in history_items]
+    total_tokens = sum(item.get("tokens", 0) for item in history_items)
+    query_tokens = count_tokens(query)
+    trimmed_flag = False
+    if total_tokens + query_tokens > max_tokens:
+        keep = []
+        running_tokens = query_tokens
+        for item in reversed(history_items):
+            t = item.get("tokens", 0)
+            if running_tokens + t > max_tokens:
+                trimmed_flag = True
+                break
+            keep.append(item["text"])
+            running_tokens += t
+        history = list(reversed(keep))
+    messages = history + [query]
+    prompt = "\n".join(messages)
+    return Ok((prompt, trimmed_flag, query_tokens))
+
+
+def _handle_event(
+    event: Event, only_final: bool, full_response_text: str
+) -> tuple[bool, Optional[str], str, bool]:
+    try:
+        logger.debug(f"Event details: {event}")
+        logger.debug(f"Event type: {type(event).__name__}")
+        if event.content and event.content.parts:
+            for i, part in enumerate(event.content.parts):
+                logger.debug(f"Part {i} details:")
+                logger.debug(f"  Text: {part.text}")
+                logger.debug(f"  Function call: {part.function_call}")
+                logger.debug(f"  Function response: {part.function_response}")
+                logger.debug(f"  Raw part: {part}")
+
+        # Partial event
+        if (
+            getattr(event, "partial", False)
+            and event.content
+            and event.content.parts
+            and event.content.parts[0].text
+        ):
+            full_response_text += event.content.parts[0].text
+            if not only_final:
+                return True, event.content.parts[0].text, full_response_text, False
+            return True, None, full_response_text, False
+
+        # Function call
+        if hasattr(event, "get_function_calls") and event.get_function_calls():
+            if not only_final:
+                return True, "（......）", full_response_text, False
+        # Final event
+        if event.is_final_response():
+            logger.info(f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})")
+            if (
+                hasattr(event, "actions")
+                and event.actions
+                and hasattr(event.actions, "escalate")
+                and event.actions.escalate
+            ):
+                escalation_message = f"⚠️ 發生錯誤: {getattr(event, 'error_message', None) or '沒有特定訊息。'}"
+                return False, escalation_message, "", True
+            if event.content and event.content.parts:
+                final_text = (full_response_text + event.content.parts[0].text).strip()
+                return False, final_text, "", True
+            else:
+                return False, "⚠️ 未收到有效回應內容。", "", True
+
+        # Non-final event full content
+        if (
+            event.content
+            and event.content.parts
+            and not getattr(event, "partial", False)
+            and not event.is_final_response()
+        ):
+            for part in event.content.parts:
+                if part.text and not only_final:
+                    return True, part.text, full_response_text, False
+        return True, None, full_response_text, False
+
+    except Exception as event_error:
+        logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+        return True, None, full_response_text, False
+
+
+class MessageCenter:
+    INVALID_INPUT = "❌ 輸入參數有誤，請確認後再試。"
+    HISTORY_ERROR = lambda err: f"❌ 歷史訊息處理錯誤: {err}"
+    HISTORY_TRIMMED = "⚠️ 部分歷史訊息因 token 限制已被省略，回應可能不完整。"
+    CONTENT_ERROR = "❌ 建立訊息內容時發生錯誤，請稍後再試。"
+    EVENT_ERROR = lambda err: f"❌ 回應處理時發生錯誤: {err}"
+
+
 async def stream_agent_responses(
     query: str,
     runner: Runner,
     user_id: str,
     session_id: str,
-    use_function_map: Union[dict[str, str], None] = None,
     only_final: bool = True,
-) -> AsyncGenerator[str, None]:
-    try:
-        logger.info(
-            f"\n>>> User Query for user {user_id}, session {session_id}: {query}"
-        )
-
-        if not query or not user_id or not session_id:
-            logger.error("Invalid input parameters")
-            yield "⚠️ Invalid input parameters"
-            return
-
-        try:
-            user_content = types.Content(role="user", parts=[types.Part(text=query)])
-        except Exception as content_error:
-            logger.error(f"Error creating content: {str(content_error)}", exc_info=True)
-            yield "⚠️ Error creating content"
-            return
-
-        full_response_text = ""
-        final_response_yielded = False
-
-        try:
-            async for event in runner.run_async(
-                user_id=user_id, session_id=session_id, new_message=user_content
-            ):
-                try:
-                    logger.debug(f"Event details: {event}")
-                    logger.debug(f"Event type: {type(event).__name__}")
-                    if event.content and event.content.parts:
-                        for i, part in enumerate(event.content.parts):
-                            logger.debug(f"Part {i} details:")
-                            logger.debug(f"  Text: {part.text}")
-                            logger.debug(f"  Function call: {part.function_call}")
-                            logger.debug(f"  Function response: {part.function_response}")
-                            logger.debug(f"  Raw part: {part}")
-                    if not event:
-                        logger.warning("Received null event")
-                        continue
-                    # Handle partial event
-                    if event.partial and event.content and event.content.parts and event.content.parts[0].text:
-                        full_response_text += event.content.parts[0].text
-                        if not only_final:
-                            yield event.content.parts[0].text
-                        continue
-                    # Handle function call
-                    if event.get_function_calls():
-                        for call in event.get_function_calls():
-                            func_name = call.name
-                            if use_function_map and func_name in use_function_map:
-                                message_to_yield = "（" + use_function_map[func_name] + "）"
-                                logger.info(
-                                    f"<<< Agent function_call received: {func_name} — yielding mapped string only (no execution)."
-                                )
-                                if not only_final:
-                                    yield message_to_yield
-                            else:
-                                if not only_final:
-                                    yield "（......）"
-                    # Handle final event
-                    if event.is_final_response() and not final_response_yielded:
-                        logger.info(
-                            f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})"
-                        )
-                        if (
-                            hasattr(event, "actions")
-                            and event.actions
-                            and hasattr(event.actions, "escalate")
-                            and event.actions.escalate
-                        ):
-                            escalation_message = f"⚠️ *Agent escalated*: {event.error_message or 'No specific message.'}"
-                            if only_final:
-                                yield escalation_message
-                            else:
-                                yield escalation_message
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                        # Normal final response
-                        if event.content and event.content.parts:
-                            final_text = (full_response_text + event.content.parts[0].text).strip()
-                            yield final_text
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                        else:
-                            if only_final:
-                                yield "⚠️ No valid response received"
-                            else:
-                                yield "⚠️ No valid response received"
-                            final_response_yielded = True
-                            full_response_text = ""
-                            return
-                    # Non-final event full content
-                    if event.content and event.content.parts and not event.partial and not event.is_final_response():
-                        for part in event.content.parts:
-                            if part.text and not only_final:
-                                yield part.text
-                except Exception as event_error:
-                    logger.error(
-                        f"Error processing event: {str(event_error)}", exc_info=True
-                    )
-                    continue
-        except Exception as stream_error:
-            logger.error(
-                f"Error in stream processing: {str(stream_error)}", exc_info=True
-            )
-            yield "⚠️ Error processing response, please try again later."
-    except Exception as e:
+    model: Optional[str] = None,
+    max_tokens: int = float("inf"),
+    interval_seconds: float = 0.0,
+) -> AsyncGenerator[Result[str, str], None]:
+    logger.info(f"\n>>> User Query for user {user_id}, session {session_id}: {query}")
+    if not query:
+        return
+    if not user_id or not session_id or not model:
         logger.error(
-            f"Unexpected error in stream_agent_responses: {str(e)}", exc_info=True
+            f"Invalid input parameters: {query}, {user_id}, {session_id}, {model}"
         )
-        yield "⚠️ Unexpected error, please try again later."
+        yield Err(MessageCenter.INVALID_INPUT)
+        return
+    broker_client = BotRedisClient()
+    prompt_result = _get_history_and_prompt(broker_client, model, query, max_tokens)
+    if prompt_result.is_err():
+        yield Err(MessageCenter.HISTORY_ERROR(prompt_result.err()))
+        return
+    prompt, trimmed_flag, query_tokens = prompt_result.ok()
+    if trimmed_flag:
+        yield Ok(MessageCenter.HISTORY_TRIMMED)
+    try_content = None
+    try:
+        try_content = types.Content(role="user", parts=[types.Part(text=prompt)])
+    except Exception as content_error:
+        logger.error(f"Error creating content: {str(content_error)}", exc_info=True)
+        yield Err(MessageCenter.CONTENT_ERROR)
+        return
+    user_content = try_content
+    full_response_text = ""
+    final_response_yielded = False
+    async for event in runner.run_async(
+        user_id=user_id, session_id=session_id, new_message=user_content
+    ):
+        try:
+            result = Ok(_handle_event(event, only_final, full_response_text))
+        except Exception as event_error:
+            logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+            result = Err(MessageCenter.EVENT_ERROR(str(event_error)))
+        if result.is_err():
+            yield result
+            continue
+        should_continue, yield_value, full_response_text, is_final = result.ok()
+        if yield_value is not None:
+            yield Ok(yield_value)
+        if is_final and not final_response_yielded:
+            try:
+                broker_client.add_message_history(
+                    model=model,
+                    text=query,
+                    tokens=query_tokens,
+                    interval_seconds=interval_seconds,
+                    timestamp=time.time(),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to add broker history: {e}")
+            final_response_yielded = True
+            full_response_text = ""
+            return
+        if not should_continue:
+            break
 
 ```
 
@@ -1787,7 +2042,7 @@ def get_logger(name: str) -> logging.Logger:
 
 ```
 
-`discord_agents/view/bot_view.py`:
+`discord_agents/view/bot_config_view.py`:
 
 ```py
 from flask_admin.contrib.sqla import ModelView
@@ -1798,7 +2053,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
-from .management_view import BotManagementView
+from .bot_manage_view import BotManageView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.tasks import should_restart_bot_task
@@ -1814,7 +2069,7 @@ def validate_json(form, field):
         raise ValidationError(f"Invalid JSON format: {str(e)}")
 
 
-class BotAgentForm(FlaskForm):
+class BotConfigForm(FlaskForm):
     # Bot fields
     token = StringField("Bot Token", validators=[DataRequired()])
     error_message = TextAreaField("Error Message", validators=[DataRequired()])
@@ -1844,8 +2099,8 @@ class BotAgentForm(FlaskForm):
     )
 
 
-class BotAgentView(ModelView):
-    form = BotAgentForm
+class BotConfigView(ModelView):
+    form = BotConfigForm
     column_list = ["id", "token", "command_prefix", "agent"]
     column_formatters = {
         "agent": lambda v, c, m, p: (m.agent.name if m.agent else "No Agent"),
@@ -1922,16 +2177,9 @@ class BotAgentView(ModelView):
             form.srv_whitelist.data = json.dumps(bot.srv_whitelist)
             form.use_function_map.data = json.dumps(bot.use_function_map)
 
-
-def init_admin(app: Flask) -> Admin:
-    admin = Admin(app, name="Discord Agents Admin", template_mode="bootstrap3")
-    admin.add_view(BotAgentView(BotModel, db.session))
-    admin.add_view(BotManagementView(name="Runner", endpoint="botmanagement"))
-    return admin
-
 ```
 
-`discord_agents/view/management_view.py`:
+`discord_agents/view/bot_manage_view.py`:
 
 ```py
 from flask_admin import BaseView, expose
@@ -1939,10 +2187,10 @@ from flask import flash, redirect, url_for, request
 from discord_agents.utils.logger import get_logger
 import json
 
-logger = get_logger("runner_view")
+logger = get_logger("bot_manage_view")
 
 
-class BotManagementView(BaseView):
+class BotManageView(BaseView):
     def __init__(self, name=None, endpoint=None, *args, **kwargs):
         super().__init__(name=name, endpoint=endpoint, *args, **kwargs)
         logger.info("BotManagementView initialized")
@@ -1971,10 +2219,10 @@ class BotManagementView(BaseView):
             else:
                 not_running_bots.append(bot_id)
         return self.render(
-            "admin/bot_management.html",
+            "admin/bot_manage.html",
             not_running_bots=not_running_bots,
             running_bots=running_bots,
-            title="Bot Management",
+            title="Bot Manage",
             error_message=error_message,
         )
 
