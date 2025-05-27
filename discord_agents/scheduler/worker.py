@@ -33,12 +33,16 @@ class BotManager:
 
     def _run_bot(self, bot_id: str, my_bot: MyBot):
         import asyncio
-
         try:
-            asyncio.run(my_bot.run())
+            loop = asyncio.new_event_loop()
+            my_bot.loop = loop
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(my_bot.run())
         except Exception as e:
             logger.error(f"Error running bot {bot_id}: {e}")
             self.remove_bot(bot_id)
+        finally:
+            loop.close()
 
     def remove_bot(self, bot_id: str):
         my_bot = self._bot_map.get(bot_id)
