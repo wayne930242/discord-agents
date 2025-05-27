@@ -14,6 +14,9 @@ logger = get_logger("base_cog")
 
 
 class AgentCog(commands.Cog):
+    USER_DM_TEMPLATE = "discord_user_dm_{user_id}"
+    CHANNEL_TEMPLATE = "discord_channel_{channel_id}"
+
     def __init__(
         self,
         bot: commands.Bot,
@@ -41,9 +44,9 @@ class AgentCog(commands.Cog):
 
     def _get_user_adk_id(self, message: discord.Message) -> Result[str, str]:
         if isinstance(message.channel, discord.DMChannel):
-            return Ok(f"discord_user_dm_{message.author.id}")
+            return Ok(AgentCog.USER_DM_TEMPLATE.format(user_id=message.author.id))
         elif isinstance(message.channel, discord.TextChannel):
-            return Ok(f"discord_channel_{message.channel.id}")
+            return Ok(AgentCog.CHANNEL_TEMPLATE.format(channel_id=message.channel.id))
         else:
             return Err(f"Unknown channel type for user {message.author.id}")
 
@@ -69,6 +72,12 @@ class AgentCog(commands.Cog):
         user_adk_id: str,
         session_id: str,
     ) -> Result[None, str]:
+        async def send_chunks(content: str):
+            cleaned_content = content.replace("<start_of_audio>", "").replace("<end_of_audio>", "")
+            for chunk in [cleaned_content[i : i + 2000] for i in range(0, len(cleaned_content), 2000)]:
+                if chunk.strip():
+                    await message.channel.send(chunk)
+
         try:
             async for part_result in stream_agent_responses(
                 query=query,
@@ -80,20 +89,11 @@ class AgentCog(commands.Cog):
                 max_tokens=self.my_agent.max_tokens,
                 interval_seconds=self.my_agent.interval_seconds,
             ):
+                if part_result.is_err():
+                    await message.channel.send(part_result.err())
+                    return Err(part_result.err())
                 try:
-                    if part_result.is_err():
-                        await message.channel.send(part_result.err())
-                        return Err(part_result.err())
-                    part_content = part_result.ok()
-                    cleaned_content = part_content.replace(
-                        "<start_of_audio>", ""
-                    ).replace("<end_of_audio>", "")
-                    for chunk in [
-                        cleaned_content[i : i + 2000]
-                        for i in range(0, len(cleaned_content), 2000)
-                    ]:
-                        if chunk.strip():
-                            await message.channel.send(chunk)
+                    await send_chunks(part_result.ok())
                 except discord.HTTPException as http_error:
                     logger.error(
                         f"Discord HTTP error while sending message: {str(http_error)}",
@@ -119,16 +119,18 @@ class AgentCog(commands.Cog):
     def parse_message_query(
         self, message: discord.Message
     ) -> Result[tuple[str, str], str]:
-        if message.author.bot or not isinstance(
-            message.channel, (discord.DMChannel, discord.TextChannel)
-        ):
+        # Bots or non-supported channels are rejected
+        if message.author.bot or not isinstance(message.channel, (discord.DMChannel, discord.TextChannel)):
             return Err("Not a valid message")
-        # Whitelist check
-        if isinstance(message.channel, discord.DMChannel):
+
+        # Check DM or TextChannel and whitelist
+        is_dm = isinstance(message.channel, discord.DMChannel)
+        is_text = isinstance(message.channel, discord.TextChannel)
+        if is_dm:
             if str(message.author.id) not in self._dm_whitelist:
                 logger.debug(f"DM from unauthorized user {message.author.id}")
                 return Err("Unauthorized DM user")
-        elif isinstance(message.channel, discord.TextChannel):
+        elif is_text:
             if self.bot.user is None or self.bot.user not in message.mentions:
                 return Err("Not mentioned bot")
             guild_id = str(getattr(message.guild, "id", ""))
@@ -137,19 +139,17 @@ class AgentCog(commands.Cog):
                 return Err("Unauthorized server")
         else:
             return Err("Unknown message channel type")
-        is_dm = isinstance(message.channel, discord.DMChannel)
-        is_mention = self.bot.user and self.bot.user in message.mentions
+
+        # Get query content
+        query = ""
         if is_dm:
             query = message.content.strip()
-        elif is_mention:
-            if self.bot.user is not None:
-                query = re.sub(
-                    rf"<@!?{self.bot.user.id}>", "", message.content, count=1
-                ).strip()
-        else:
-            return Err("Not a DM and not mentioned bot")
+        elif self.bot.user and self.bot.user in message.mentions:
+            query = re.sub(rf"<@!?{self.bot.user.id}>", "", message.content, count=1).strip()
         if not query:
             return Err("Query content is empty")
+
+        # Get user_adk_id
         user_adk_id = self._get_user_adk_id(message)
         if user_adk_id.is_err():
             return Err(f"Failed to get user_adk_id: {user_adk_id.err()}")
@@ -202,16 +202,16 @@ class AgentCog(commands.Cog):
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
-                user_adk_id = f"discord_channel_{target_user_id[8:]}"
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=target_user_id[8:])
             elif target_user_id.startswith("dm_"):
-                user_adk_id = f"discord_user_dm_{target_user_id[3:]}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id[3:])
             else:
-                user_adk_id = f"discord_user_dm_{target_user_id}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id)
         else:
             if isinstance(ctx.channel, discord.DMChannel):
-                user_adk_id = f"discord_user_dm_{ctx.author.id}"
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=ctx.author.id)
             elif isinstance(ctx.channel, discord.TextChannel):
-                user_adk_id = f"discord_channel_{ctx.channel.id}"
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=ctx.channel.id)
             else:
                 user_adk_id = f"discord_unknown_{ctx.author.id}"
         sessions_resp = self.session_service.list_sessions(
