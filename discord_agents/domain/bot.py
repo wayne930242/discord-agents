@@ -139,6 +139,7 @@ class MyBot:
     async def run(self) -> Result[None, str]:
         logger.info("Starting bot...")
         try:
+            self.loop = asyncio.get_running_loop()
             await self._bot.start(self._token)
             return Ok(None)
         except Exception as e:

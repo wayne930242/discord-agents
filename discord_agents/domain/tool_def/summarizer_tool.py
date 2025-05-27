@@ -24,7 +24,17 @@ def create_summarizer_agent():
         name="summarizer",
         model="gemini-2.5-flash-preview-04-17",
         description="A specialized agent that summarizes content at various detail levels.",
-        instruction="""You are a professional content summarizer.\n\nFirst, use the summarize_content tool to load the content into memory.\n\nThen, summarize the content stored in state['content_to_summarize'] according to the requested length in state['requested_summary_length']:\n- \"short\": A concise summary in 1-3 sentences, capturing only the essential point.\n- \"medium\": A balanced summary in 1-3 paragraphs, covering key points and some supporting details.\n- \"long\": A comprehensive summary in multiple paragraphs, preserving nuances and important contexts.\n\nAlways structure summaries with clear headings and bullet points when appropriate.\nPrioritize accuracy over brevity - never include information not found in the original text.\nFor technical or complex content, preserve the key terminology used in the original text.\n""",
+        instruction=(
+            "You are a professional content summarizer. "
+            "First, use the summarize_content tool to load the content into memory. "
+            "Then, summarize the content stored in state['content_to_summarize'] according to the requested length in state['requested_summary_length']: "
+            '- "short": A concise summary in 1-3 sentences, capturing only the essential point. '
+            '- "medium": A balanced summary in 1-3 paragraphs, covering key points and some supporting details. '
+            '- "long": A comprehensive summary in multiple paragraphs, preserving nuances and important contexts. '
+            "Always structure summaries with clear headings and bullet points when appropriate. "
+            "Prioritize accuracy over brevity - never include information not found in the original text. "
+            "For technical or complex content, preserve the key terminology used in the original text."
+        ),
         tools=[summarize_content],
     )
     return summarizer_agent

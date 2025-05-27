@@ -21,7 +21,6 @@ def bot_idle_task(bot_id: str):
 
 
 def should_start_bot_in_model_task(bot_id: str):
-    logger.info(f"Dispatch start bot task for {bot_id}")
     with get_flask_app().app_context():
         db_id = int(bot_id.replace("bot_", ""))
         bot: Optional[BotModel] = BotModel.query.get(db_id)

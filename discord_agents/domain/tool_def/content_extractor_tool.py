@@ -2,7 +2,6 @@ from google.adk import Agent
 from google.adk.tools import FunctionTool
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
-import asyncio
 
 try:
     from crawl4ai import AsyncWebCrawler

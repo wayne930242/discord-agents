@@ -63,11 +63,11 @@ class BotManageView(BaseView):
 
     @expose("/stop/<bot_id>")
     def stop_bot(self, bot_id):
-        from discord_agents.scheduler.tasks import stop_bot_task
+        from discord_agents.scheduler.tasks import should_stop_bot_task
 
         logger.info(f"Receive request to stop bot {bot_id}")
         try:
-            stop_bot_task(bot_id)
+            should_stop_bot_task(bot_id)
             logger.info(f"Bot {bot_id} stop task dispatched")
             flash(f"Bot {bot_id} stop task dispatched", "success")
             return redirect(url_for(".index"))
