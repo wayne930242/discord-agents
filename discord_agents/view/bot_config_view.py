@@ -1,16 +1,15 @@
 from flask_admin.contrib.sqla import ModelView
-from flask_admin import Admin
 from discord_agents.models.bot import db, BotModel, AgentModel
-from flask import Flask
+from flask import request
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
-from .bot_manage_view import BotManageView
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.tasks import should_restart_bot_task
 from discord_agents.domain.agent import LLMs
+from discord_agents.utils.auth import check_auth, authenticate
 
 logger = get_logger("bot_view")
 
@@ -73,6 +72,15 @@ class BotConfigView(ModelView):
         "agent_model",
         "tools",
     ]
+
+    def is_accessible(self):
+        """Check if the current user is authenticated"""
+        auth = request.authorization
+        return auth and check_auth(auth.username, auth.password)
+
+    def inaccessible_callback(self, name, **kwargs):
+        """Redirect to authentication if not accessible"""
+        return authenticate()
 
     def on_model_change(
         self, form: FlaskForm, model: BotModel, is_created: bool

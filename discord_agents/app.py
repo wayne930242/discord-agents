@@ -1,15 +1,28 @@
 import os
-from flask import Flask, redirect, url_for
-from flask_admin import Admin
+from flask import Flask, redirect, url_for, request
+from flask_admin import Admin, AdminIndexView
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
 from discord_agents.models.bot import db, BotModel
 from discord_agents.view.bot_config_view import BotConfigView
 from discord_agents.view.bot_manage_view import BotManageView
-from discord_agents.utils.auth import requires_auth
+from discord_agents.utils.auth import requires_auth, check_auth, authenticate
 from discord_agents.scheduler.worker import bot_manager
 
 logger = get_logger("app")
+
+
+class SecureAdminIndexView(AdminIndexView):
+    """Custom AdminIndexView with authentication"""
+
+    def is_accessible(self):
+        """Check if the current user is authenticated"""
+        auth = request.authorization
+        return auth and check_auth(auth.username, auth.password)
+
+    def inaccessible_callback(self, name, **kwargs):
+        """Redirect to authentication if not accessible"""
+        return authenticate()
 
 
 def init_db(app: Flask):
@@ -21,7 +34,12 @@ def init_db(app: Flask):
 
 def init_admin(app: Flask):
     logger.info("Initializing admin interface...")
-    admin = Admin(app, name="Discord Agents", template_mode="bootstrap4")
+    admin = Admin(
+        app,
+        name="Discord Agents",
+        template_mode="bootstrap4",
+        index_view=SecureAdminIndexView()
+    )
     admin.add_view(BotConfigView(BotModel, db.session))
     admin.add_view(BotManageView(name="Bot Manage", endpoint="botmanageview"))
     logger.info("Admin interface initialized")

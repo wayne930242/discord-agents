@@ -1,6 +1,7 @@
 from flask_admin import BaseView, expose
 from flask import flash, redirect, url_for, request
 from discord_agents.utils.logger import get_logger
+from discord_agents.utils.auth import check_auth, authenticate
 import json
 
 logger = get_logger("bot_manage_view")
@@ -10,6 +11,15 @@ class BotManageView(BaseView):
     def __init__(self, name=None, endpoint=None, *args, **kwargs):
         super().__init__(name=name, endpoint=endpoint, *args, **kwargs)
         logger.info("BotManagementView initialized")
+
+    def is_accessible(self):
+        """Check if the current user is authenticated"""
+        auth = request.authorization
+        return auth and check_auth(auth.username, auth.password)
+
+    def inaccessible_callback(self, name, **kwargs):
+        """Redirect to authentication if not accessible"""
+        return authenticate()
 
     @expose("/")
     def index(self):
