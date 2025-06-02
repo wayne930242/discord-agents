@@ -171,18 +171,10 @@ class AgentCog(commands.Cog):
         elif isinstance(message.channel, discord.TextChannel):
             user_info_parts.append(f"Channel Type: Text Channel")
             user_info_parts.append(f"Channel Name: #{message.channel.name}")
-            user_info_parts.append(f"Channel ID: {message.channel.id}")
 
             # Guild/Server info
             if message.guild:
                 user_info_parts.append(f"Server Name: {message.guild.name}")
-                user_info_parts.append(f"Server ID: {message.guild.id}")
-
-                # User roles in guild
-                if hasattr(message.author, 'roles') and message.author.roles:
-                    role_names = [role.name for role in message.author.roles if role.name != "@everyone"]
-                    if role_names:
-                        user_info_parts.append(f"User Roles: {', '.join(role_names)}")
 
         return "[USER_INFO]\n" + "\n".join(user_info_parts) + "\n[/USER_INFO]\n\n"
 
