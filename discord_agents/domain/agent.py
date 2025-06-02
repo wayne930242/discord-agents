@@ -174,12 +174,15 @@ class MyAgent:
             "[USER_INFO]\n"
             "User ID: <discord_user_id>\n"
             "Username: <username>\n"
-            "Display Name: <display_name> (if different from username)\n"
+            "Global Display Name: <global_display_name> (if user has set one)\n"
+            "Server Display Name: <server_display_name> (if different from username and global name)\n"
             "Channel Type: <Direct Message|Text Channel>\n"
             "Channel Name: <channel_name> (for text channels)\n"
             "Server Name: <server_name> (for text channels)\n"
             "[/USER_INFO]\n\n"
             "Use this information to provide personalized responses and understand the context of the conversation. "
+            "Note that users may have different display names: their original username, a global display name set across Discord, "
+            "and/or a server-specific display name (nickname) in individual servers. "
             "The actual user message follows after the [/USER_INFO] section.\n\n"
         )
 

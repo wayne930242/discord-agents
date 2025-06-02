@@ -162,8 +162,16 @@ class AgentCog(commands.Cog):
         # Basic user info
         user_info_parts.append(f"User ID: {message.author.id}")
         user_info_parts.append(f"Username: {message.author.name}")
+
+        # Global display name (if set)
+        if hasattr(message.author, 'global_name') and message.author.global_name:
+            user_info_parts.append(f"Global Display Name: {message.author.global_name}")
+
+        # Server-specific display name (if different from username and global name)
         if message.author.display_name != message.author.name:
-            user_info_parts.append(f"Display Name: {message.author.display_name}")
+            # Check if it's different from global_name too
+            if not hasattr(message.author, 'global_name') or message.author.display_name != message.author.global_name:
+                user_info_parts.append(f"Server Display Name: {message.author.display_name}")
 
         # Channel context
         if isinstance(message.channel, discord.DMChannel):
