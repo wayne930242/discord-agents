@@ -155,6 +155,37 @@ class AgentCog(commands.Cog):
             return Err(f"Failed to get user_adk_id: {user_adk_id.err()}")
         return Ok((query, user_adk_id.ok()))
 
+    def _format_user_info(self, message: discord.Message) -> str:
+        """Format user information for the agent context."""
+        user_info_parts = []
+
+        # Basic user info
+        user_info_parts.append(f"User ID: {message.author.id}")
+        user_info_parts.append(f"Username: {message.author.name}")
+        if message.author.display_name != message.author.name:
+            user_info_parts.append(f"Display Name: {message.author.display_name}")
+
+        # Channel context
+        if isinstance(message.channel, discord.DMChannel):
+            user_info_parts.append("Channel Type: Direct Message")
+        elif isinstance(message.channel, discord.TextChannel):
+            user_info_parts.append(f"Channel Type: Text Channel")
+            user_info_parts.append(f"Channel Name: #{message.channel.name}")
+            user_info_parts.append(f"Channel ID: {message.channel.id}")
+
+            # Guild/Server info
+            if message.guild:
+                user_info_parts.append(f"Server Name: {message.guild.name}")
+                user_info_parts.append(f"Server ID: {message.guild.id}")
+
+                # User roles in guild
+                if hasattr(message.author, 'roles') and message.author.roles:
+                    role_names = [role.name for role in message.author.roles if role.name != "@everyone"]
+                    if role_names:
+                        user_info_parts.append(f"User Roles: {', '.join(role_names)}")
+
+        return "[USER_INFO]\n" + "\n".join(user_info_parts) + "\n[/USER_INFO]\n\n"
+
     @commands.Cog.listener("on_message")
     async def _on_message(self, message: discord.Message) -> None:
         result = self.parse_message_query(message)
@@ -173,13 +204,17 @@ class AgentCog(commands.Cog):
             return
         session_id = session_result.ok()
 
+        # Format user info and prepend to query
+        user_info = self._format_user_info(message)
+        enhanced_query = user_info + query
+
         runner = Runner(
             app_name=self.APP_NAME,
             session_service=self.session_service,
             agent=self.my_agent.get_agent(),
         )
         stream_result = await self.process_agent_stream_responses(
-            message, runner, query, user_adk_id, session_id
+            message, runner, enhanced_query, user_adk_id, session_id
         )
         if stream_result.is_err():
             logger.error(

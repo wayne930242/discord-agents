@@ -167,7 +167,27 @@ class MyAgent:
             tools = []
         self.name = name
         self.description = description
-        self.instructions = f"{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
+
+        # Add user info instructions at the beginning
+        user_info_instructions = (
+            "IMPORTANT: Each user message will include user context information at the beginning in the following format:\n"
+            "[USER_INFO]\n"
+            "User ID: <discord_user_id>\n"
+            "Username: <username>\n"
+            "Display Name: <display_name> (if different from username)\n"
+            "Channel Type: <Direct Message|Text Channel>\n"
+            "Channel Name: <channel_name> (for text channels)\n"
+            "Channel ID: <channel_id> (for text channels)\n"
+            "Server Name: <server_name> (for text channels)\n"
+            "Server ID: <server_id> (for text channels)\n"
+            "User Roles: <role1, role2, ...> (for text channels, if user has roles)\n"
+            "[/USER_INFO]\n\n"
+            "Use this information to provide personalized responses and understand the context of the conversation. "
+            "The actual user message follows after the [/USER_INFO] section.\n\n"
+        )
+
+        self.instructions = f"{user_info_instructions}{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
+
         if tools and all(isinstance(t, str) for t in tools):
             self.tool_names = tools
             self.tools = Tools.get_tools(tools)
