@@ -223,32 +223,48 @@ async def stream_agent_responses(
     user_content = try_content
     full_response_text = ""
     final_response_yielded = False
-    async for event in runner.run_async(
-        user_id=user_id, session_id=session_id, new_message=user_content
-    ):
-        try:
-            should_continue, yield_value, full_response_text, is_final = _handle_event(
-                event, only_final, full_response_text
-            )
-            if yield_value is not None:
-                yield Ok(yield_value)
-        except Exception as event_error:
-            logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
-            yield Err(MessageCenter.EVENT_ERROR(str(event_error)))
-            continue
-        if is_final and not final_response_yielded:
+    try:
+        async for event in runner.run_async(
+            user_id=user_id, session_id=session_id, new_message=user_content
+        ):
             try:
-                broker_client.add_message_history(
-                    model=model,
-                    text=query,
-                    tokens=query_tokens,
-                    interval_seconds=interval_seconds,
-                    timestamp=time.time(),
+                should_continue, yield_value, full_response_text, is_final = (
+                    _handle_event(event, only_final, full_response_text)
                 )
-            except Exception as e:
-                logger.warning(f"Failed to add broker history: {e}")
-            final_response_yielded = True
-            full_response_text = ""
+                if yield_value is not None:
+                    yield Ok(yield_value)
+            except Exception as event_error:
+                logger.error(
+                    f"Error processing event: {str(event_error)}", exc_info=True
+                )
+                yield Err(MessageCenter.EVENT_ERROR(str(event_error)))
+                continue
+            if is_final and not final_response_yielded:
+                try:
+                    broker_client.add_message_history(
+                        model=model,
+                        text=query,
+                        tokens=query_tokens,
+                        interval_seconds=interval_seconds,
+                        timestamp=time.time(),
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to add broker history: {e}")
+                final_response_yielded = True
+                full_response_text = ""
+                return
+            if not should_continue:
+                break
+    except KeyError as ke:
+        if "Context variable not found" in str(ke) and "memory" in str(ke):
+            logger.error(f"Memory context variable error: {ke}")
+            yield Err("❌ 系統配置錯誤：缺少記憶體變數設定。請聯繫管理員修復此問題。")
             return
-        if not should_continue:
-            break
+        else:
+            logger.error(f"KeyError in runner.run_async: {ke}", exc_info=True)
+            yield Err(MessageCenter.EVENT_ERROR(str(ke)))
+            return
+    except Exception as runner_error:
+        logger.error(f"Error in runner.run_async: {runner_error}", exc_info=True)
+        yield Err(MessageCenter.EVENT_ERROR(str(runner_error)))
+        return
