@@ -9,7 +9,9 @@ from discord_agents.domain.tool_def.math_tool import math_tool
 from discord_agents.domain.tool_def.note_wrapper_tool import note_wrapper_tool
 
 from typing import Optional
+from discord_agents.utils.logger import get_logger
 
+logger = get_logger("tools")
 
 TOOLS_DICT: dict[str, BaseTool] = {
     "search": search_tool,
@@ -21,17 +23,45 @@ TOOLS_DICT: dict[str, BaseTool] = {
     "notes": note_wrapper_tool,
 }
 
+logger.info(f"TOOLS_DICT initialized with {len(TOOLS_DICT)} tools:")
+for tool_name, tool_obj in TOOLS_DICT.items():
+    logger.info(f"  - {tool_name}: {type(tool_obj).__name__} (name='{tool_obj.name}')")
+
 
 class Tools:
     @classmethod
     def get_tool(cls, name: str) -> BaseTool:
-        return TOOLS_DICT[name]
+        logger.debug(f"Getting single tool: {name}")
+        if name not in TOOLS_DICT:
+            logger.error(f"Tool '{name}' not found in TOOLS_DICT. Available tools: {list(TOOLS_DICT.keys())}")
+            raise KeyError(f"Tool '{name}' not found")
+        tool = TOOLS_DICT[name]
+        logger.debug(f"Retrieved tool '{name}': {type(tool).__name__}")
+        return tool
 
     @classmethod
     def get_tools(cls, names: Optional[list[str]] = None) -> list[BaseTool]:
+        logger.info(f"Getting tools with names: {names}")
         if names is None:
+            logger.info("No names provided, returning all tools")
             return list(TOOLS_DICT.values())
-        return [TOOLS_DICT[name] for name in names]
+
+        tools = []
+        for name in names:
+            if name not in TOOLS_DICT:
+                logger.error(f"Tool '{name}' not found in TOOLS_DICT. Available tools: {list(TOOLS_DICT.keys())}")
+                continue
+            tool = TOOLS_DICT[name]
+            tools.append(tool)
+            logger.info(f"  ✅ Loaded tool '{name}': {type(tool).__name__} (tool.name='{tool.name}')")
+
+            # 特別標記 notes 工具
+            if name == "notes":
+                logger.info(f"     🎯 NOTES TOOL LOADED! Type: {type(tool).__name__}")
+                logger.info(f"     Description: {tool.description[:100]}...")
+
+        logger.info(f"Successfully loaded {len(tools)} tools out of {len(names)} requested")
+        return tools
 
     @classmethod
     def get_tool_names(cls) -> list[str]:

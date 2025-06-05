@@ -208,6 +208,22 @@ class NoteTool(BaseTool):
             sql_query, (session_id, search_pattern, search_pattern)
         )
 
+    def _delete_notes_by_session(self, session_id: str) -> int:
+        """Delete all notes for a specific session and return count of deleted notes"""
+        query = """
+            DELETE FROM notes
+            WHERE session_id = %s
+            RETURNING id;
+        """
+        try:
+            result = self._execute_sql(query, (session_id,))
+            deleted_count = len(result) if result else 0
+            logger.info(f"Deleted {deleted_count} notes for session {session_id}")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Failed to delete notes for session {session_id}: {str(e)}", exc_info=True)
+            return 0
+
     async def call(self, session_id: str, action: str, **kwargs: Any) -> str:
         """
         Main entry point for the note tool

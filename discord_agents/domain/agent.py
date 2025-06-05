@@ -188,10 +188,25 @@ class MyAgent:
 
         self.instructions = f"{user_info_instructions}{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
 
+        logger.info(f"Initializing agent '{name}' with tools input: {tools}")
+        logger.info(f"Tools input type: {type(tools)}")
+
         if tools and all(isinstance(t, str) for t in tools):
+            logger.info("✅ Tools input is valid (list of strings)")
             self.tool_names: List[str] = tools
+            logger.info(f"Tool names to load: {self.tool_names}")
+
             self.tools = Tools.get_tools(tools)
+            logger.info(f"Successfully loaded {len(self.tools)} tools:")
+            for i, tool in enumerate(self.tools, 1):
+                tool_type = type(tool).__name__
+                logger.info(f"  {i}. {tool.name} ({tool_type})")
         else:
+            logger.warning("❌ Tools input is not valid (not a list of strings)")
+            logger.info(f"Tools exists: {bool(tools)}")
+            if tools:
+                logger.info(f"All strings: {all(isinstance(t, str) for t in tools)}")
+                logger.info(f"Tool types: {[type(t) for t in tools]}")
             self.tool_names = []
             self.tools = tools or []
 

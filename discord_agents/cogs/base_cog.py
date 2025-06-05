@@ -84,6 +84,13 @@ class AgentCog(commands.Cog):
                     await message.channel.send(chunk)
 
         try:
+            # Handle max_tokens conversion - avoid converting infinity to int
+            max_tokens_value = self.my_agent.max_tokens
+            if max_tokens_value == float("inf"):
+                processed_max_tokens = max_tokens_value
+            else:
+                processed_max_tokens = int(max_tokens_value)
+
             async for part_result in stream_agent_responses(
                 query=query,
                 runner=runner,
@@ -91,7 +98,7 @@ class AgentCog(commands.Cog):
                 session_id=session_id,
                 only_final=True,
                 model=self.my_agent.model_name,
-                max_tokens=int(self.my_agent.max_tokens),
+                max_tokens=processed_max_tokens,
                 interval_seconds=self.my_agent.interval_seconds,
             ):
                 if part_result.is_err():
@@ -225,14 +232,18 @@ class AgentCog(commands.Cog):
 
         # Set session_id for note tool if it exists
         try:
+            logger.debug(f"Attempting to set session_id {session_id} for note tool...")
             from discord_agents.domain.tool_def.note_wrapper_tool import (
-                note_wrapper_tool,
+                set_note_session_id,
             )
 
             if session_id:  # Ensure session_id is not None
-                note_wrapper_tool.set_session_id(session_id)
+                set_note_session_id(session_id)
+                logger.info(f"✅ Successfully set session_id {session_id} for note_wrapper_tool")
+            else:
+                logger.warning("❌ session_id is None, cannot set for note_wrapper_tool")
         except Exception as e:
-            logger.debug(f"Could not set session_id for note tool: {str(e)}")
+            logger.error(f"❌ Could not set session_id for note tool: {str(e)}", exc_info=True)
 
         # Format user info and prepend to query
         user_info = self._format_user_info(message)
@@ -298,11 +309,39 @@ class AgentCog(commands.Cog):
         if not session_list:
             await ctx.send("未找到對話紀錄。")
             return
+
+        # Track session IDs for note deletion
+        session_ids_to_delete = []
+
         for session in session_list:
+            session_ids_to_delete.append(session.id)
             self.session_service.delete_session(
                 app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
             )
-        await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
+
+        # Clear the cached session ID from memory
+        if user_adk_id in self.user_sessions:
+            del self.user_sessions[user_adk_id]
+            logger.info(f"Cleared cached session for user {user_adk_id}")
+
+        # Delete notes associated with these sessions
+        notes_deleted = 0
+        try:
+            from discord_agents.domain.tool_def.note_tool import note_tool
+            for session_id in session_ids_to_delete:
+                # Use the note tool's direct database access to delete notes by session_id
+                try:
+                    deleted_count = note_tool._delete_notes_by_session(session_id)
+                    notes_deleted += deleted_count
+                except Exception as e:
+                    logger.warning(f"Failed to delete notes for session {session_id}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Failed to delete notes during clear_sessions: {str(e)}", exc_info=True)
+
+        if notes_deleted > 0:
+            await ctx.send(f"已清除 {len(session_list)} 個對話紀錄和 {notes_deleted} 個筆記。")
+        else:
+            await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
 
     @commands.command(name="info")
     async def info_command(self, ctx: commands.Context) -> None:

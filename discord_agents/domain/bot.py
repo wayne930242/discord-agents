@@ -112,7 +112,7 @@ class MyBot:
                 role_instructions=config["role_instructions"],
                 tool_instructions=config["tool_instructions"],
                 model_name=config["agent_model"],
-                tools=Tools.get_tools(config["tools"]),
+                tools=config["tools"],
             )
             self._cog = AgentCog(
                 bot=self._bot,
@@ -137,6 +137,32 @@ class MyBot:
             try:
                 await self._bot.add_cog(self._cog)
                 logger.info(f"Cog added successfully: {self._cog}")
+
+                agent = self._cog.my_agent
+                logger.info("=" * 60)
+                logger.info("BOT CONFIGURATION SUMMARY")
+                logger.info("=" * 60)
+                logger.info(f"Bot ID: {self.bot_id}")
+                logger.info(f"Bot Username: {self._bot.user}")
+                logger.info(f"Command Prefix: {self._command_prefix}")
+                logger.info(f"App Name: {self._cog.APP_NAME}")
+                logger.info(f"Agent Name: {agent.name}")
+                logger.info(f"Model: {agent.model_name}")
+                logger.info(f"Max Tokens: {agent.max_tokens}")
+                logger.info(f"Interval Seconds: {agent.interval_seconds}")
+                logger.info(
+                    f"DM Whitelist ({len(self._dm_whitelist)}): {self._dm_whitelist}"
+                )
+                logger.info(
+                    f"Server Whitelist ({len(self._srv_whitelist)}): {self._srv_whitelist}"
+                )
+
+                logger.info(f"TOOLS LOADED ({len(agent.tools)}):")
+                for i, tool in enumerate(agent.tools, 1):
+                    tool_type = type(tool).__name__
+                    logger.info(f"  {i}. {tool.name} ({tool_type})")
+
+                logger.info("=" * 60)
                 return Ok(None)
             except Exception as e:
                 logger.error(f"Error in on_ready event: {str(e)}", exc_info=True)
