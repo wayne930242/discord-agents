@@ -53,16 +53,48 @@ class AgentCog(commands.Cog):
     async def _ensure_session(self, user_adk_id: str) -> Result[str, str]:
         if user_adk_id in self.user_sessions:
             return Ok(self.user_sessions[user_adk_id])
-        new_session = self.session_service.create_session(
-            user_id=user_adk_id,
-            app_name=self.APP_NAME,
-        )
-        if new_session is None or not hasattr(new_session, "id"):
-            return Err("The session object returned by create_session is invalid.")
-        session_id = str(new_session.id)
-        self.user_sessions[user_adk_id] = session_id
-        logger.info(f"Created new session {session_id} for user {user_adk_id}")
-        return Ok(session_id)
+
+        # Try to create session with error handling
+        try:
+            new_session = self.session_service.create_session(
+                user_id=user_adk_id,
+                app_name=self.APP_NAME,
+            )
+            if new_session is None or not hasattr(new_session, "id"):
+                return Err("The session object returned by create_session is invalid.")
+            session_id = str(new_session.id)
+            self.user_sessions[user_adk_id] = session_id
+            logger.info(f"Created new session {session_id} for user {user_adk_id}")
+            return Ok(session_id)
+        except Exception as session_error:
+            logger.error(f"Error creating session: {str(session_error)}", exc_info=True)
+            # Try to clear existing sessions and retry once
+            try:
+                logger.info(f"Attempting to clear existing sessions for {user_adk_id}")
+                sessions_resp = self.session_service.list_sessions(
+                    app_name=self.APP_NAME, user_id=user_adk_id
+                )
+                session_list = getattr(sessions_resp, "sessions", [])
+                for session in session_list or []:
+                    self.session_service.delete_session(
+                        app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
+                    )
+                logger.info(f"Cleared {len(session_list or [])} existing sessions")
+
+                # Retry creating session
+                new_session = self.session_service.create_session(
+                    user_id=user_adk_id,
+                    app_name=self.APP_NAME,
+                )
+                if new_session is None or not hasattr(new_session, "id"):
+                    return Err("Failed to create session even after cleanup.")
+                session_id = str(new_session.id)
+                self.user_sessions[user_adk_id] = session_id
+                logger.info(f"Successfully created new session {session_id} after cleanup")
+                return Ok(session_id)
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup and recreate session: {str(cleanup_error)}", exc_info=True)
+                return Err(f"Session creation failed: {str(session_error)}")
 
     async def process_agent_stream_responses(
         self,
@@ -255,11 +287,19 @@ class AgentCog(commands.Cog):
         user_info = self._format_user_info(message)
         enhanced_query = user_info + query
 
-        runner = Runner(
-            app_name=self.APP_NAME,
-            session_service=self.session_service,
-            agent=self.my_agent.get_agent(),
-        )
+        # Try to create Runner with error handling
+        try:
+            runner = Runner(
+                app_name=self.APP_NAME,
+                session_service=self.session_service,
+                agent=self.my_agent.get_agent(),
+            )
+            logger.debug(f"Runner created successfully for app: {self.APP_NAME}")
+        except Exception as runner_error:
+            logger.error(f"Failed to create Runner: {str(runner_error)}", exc_info=True)
+            await message.channel.send("❌ 無法初始化對話系統，請稍後再試。")
+            return
+
         # Ensure session_id is not None for process_agent_stream_responses
         if session_id:
             stream_result = await self.process_agent_stream_responses(
