@@ -239,11 +239,17 @@ class AgentCog(commands.Cog):
 
             if session_id:  # Ensure session_id is not None
                 set_note_session_id(session_id)
-                logger.info(f"✅ Successfully set session_id {session_id} for note_wrapper_tool")
+                logger.info(
+                    f"✅ Successfully set session_id {session_id} for note_wrapper_tool"
+                )
             else:
-                logger.warning("❌ session_id is None, cannot set for note_wrapper_tool")
+                logger.warning(
+                    "❌ session_id is None, cannot set for note_wrapper_tool"
+                )
         except Exception as e:
-            logger.error(f"❌ Could not set session_id for note tool: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ Could not set session_id for note tool: {str(e)}", exc_info=True
+            )
 
         # Format user info and prepend to query
         user_info = self._format_user_info(message)
@@ -328,18 +334,25 @@ class AgentCog(commands.Cog):
         notes_deleted = 0
         try:
             from discord_agents.domain.tool_def.note_tool import note_tool
+
             for session_id in session_ids_to_delete:
                 # Use the note tool's direct database access to delete notes by session_id
                 try:
                     deleted_count = note_tool._delete_notes_by_session(session_id)
                     notes_deleted += deleted_count
                 except Exception as e:
-                    logger.warning(f"Failed to delete notes for session {session_id}: {str(e)}")
+                    logger.warning(
+                        f"Failed to delete notes for session {session_id}: {str(e)}"
+                    )
         except Exception as e:
-            logger.error(f"Failed to delete notes during clear_sessions: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to delete notes during clear_sessions: {str(e)}", exc_info=True
+            )
 
         if notes_deleted > 0:
-            await ctx.send(f"已清除 {len(session_list)} 個對話紀錄和 {notes_deleted} 個筆記。")
+            await ctx.send(
+                f"已清除 {len(session_list)} 個對話紀錄和 {notes_deleted} 個筆記。"
+            )
         else:
             await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
 
