@@ -5,7 +5,7 @@ from result import Result, Ok, Err
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from typing import Optional
+from typing import Optional, Union
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.agent import MyAgent
@@ -53,48 +53,16 @@ class AgentCog(commands.Cog):
     async def _ensure_session(self, user_adk_id: str) -> Result[str, str]:
         if user_adk_id in self.user_sessions:
             return Ok(self.user_sessions[user_adk_id])
-
-        # Try to create session with error handling
-        try:
-            new_session = self.session_service.create_session(
-                user_id=user_adk_id,
-                app_name=self.APP_NAME,
-            )
-            if new_session is None or not hasattr(new_session, "id"):
-                return Err("The session object returned by create_session is invalid.")
-            session_id = str(new_session.id)
-            self.user_sessions[user_adk_id] = session_id
-            logger.info(f"Created new session {session_id} for user {user_adk_id}")
-            return Ok(session_id)
-        except Exception as session_error:
-            logger.error(f"Error creating session: {str(session_error)}", exc_info=True)
-            # Try to clear existing sessions and retry once
-            try:
-                logger.info(f"Attempting to clear existing sessions for {user_adk_id}")
-                sessions_resp = self.session_service.list_sessions(
-                    app_name=self.APP_NAME, user_id=user_adk_id
-                )
-                session_list = getattr(sessions_resp, "sessions", [])
-                for session in session_list or []:
-                    self.session_service.delete_session(
-                        app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
-                    )
-                logger.info(f"Cleared {len(session_list or [])} existing sessions")
-
-                # Retry creating session
-                new_session = self.session_service.create_session(
-                    user_id=user_adk_id,
-                    app_name=self.APP_NAME,
-                )
-                if new_session is None or not hasattr(new_session, "id"):
-                    return Err("Failed to create session even after cleanup.")
-                session_id = str(new_session.id)
-                self.user_sessions[user_adk_id] = session_id
-                logger.info(f"Successfully created new session {session_id} after cleanup")
-                return Ok(session_id)
-            except Exception as cleanup_error:
-                logger.error(f"Failed to cleanup and recreate session: {str(cleanup_error)}", exc_info=True)
-                return Err(f"Session creation failed: {str(session_error)}")
+        new_session = self.session_service.create_session(
+            user_id=user_adk_id,
+            app_name=self.APP_NAME,
+        )
+        if new_session is None or not hasattr(new_session, "id"):
+            return Err("The session object returned by create_session is invalid.")
+        session_id = str(new_session.id)
+        self.user_sessions[user_adk_id] = session_id
+        logger.info(f"Created new session {session_id} for user {user_adk_id}")
+        return Ok(session_id)
 
     async def process_agent_stream_responses(
         self,
@@ -116,13 +84,6 @@ class AgentCog(commands.Cog):
                     await message.channel.send(chunk)
 
         try:
-            # Handle max_tokens conversion - avoid converting infinity to int
-            max_tokens_value = self.my_agent.max_tokens
-            if max_tokens_value == float("inf"):
-                processed_max_tokens = max_tokens_value
-            else:
-                processed_max_tokens = int(max_tokens_value)
-
             async for part_result in stream_agent_responses(
                 query=query,
                 runner=runner,
@@ -130,18 +91,17 @@ class AgentCog(commands.Cog):
                 session_id=session_id,
                 only_final=True,
                 model=self.my_agent.model_name,
-                max_tokens=processed_max_tokens,
+                max_tokens=self.my_agent.max_tokens,
                 interval_seconds=self.my_agent.interval_seconds,
             ):
                 if part_result.is_err():
-                    error_msg = part_result.err()
-                    if error_msg:
-                        await message.channel.send(error_msg)
-                    return Err(error_msg or "Unknown error")
+                    error_msg = part_result.err() or "Unknown error"
+                    await message.channel.send(error_msg)
+                    return Err(error_msg)
                 try:
-                    result_content = part_result.ok()
-                    if result_content:
-                        await send_chunks(result_content)
+                    content = part_result.ok()
+                    if content:
+                        await send_chunks(content)
                 except discord.HTTPException as http_error:
                     logger.error(
                         f"Discord HTTP error while sending message: {str(http_error)}",
@@ -202,15 +162,17 @@ class AgentCog(commands.Cog):
             return Err("Query content is empty")
 
         # Get user_adk_id
-        user_adk_id_result = self._get_user_adk_id(message)
-        if user_adk_id_result.is_err():
-            return Err(f"Failed to get user_adk_id: {user_adk_id_result.err()}")
-        user_adk_id: str = user_adk_id_result.ok()  # type: ignore
-        return Ok((query, user_adk_id))
+        user_adk_id = self._get_user_adk_id(message)
+        if user_adk_id.is_err():
+            return Err(f"Failed to get user_adk_id: {user_adk_id.err()}")
+        user_id_result = user_adk_id.ok()
+        if user_id_result is None:
+            return Err("Failed to get user_adk_id")
+        return Ok((query, user_id_result))
 
     def _format_user_info(self, message: discord.Message) -> str:
         """Format user information for the agent context."""
-        user_info_parts: list[str] = []
+        user_info_parts = []
 
         # Basic user info
         user_info_parts.append(f"User ID: {message.author.id}")
@@ -249,7 +211,11 @@ class AgentCog(commands.Cog):
         result = self.parse_message_query(message)
         if result.is_err():
             return
-        query, user_adk_id = result.ok()  # type: ignore
+        result_tuple = result.ok()
+        if result_tuple is None:
+            logger.error("Failed to get parse result")
+            return
+        query, user_adk_id = result_tuple
         if not query:
             logger.debug("Query is empty after parse_message_query.")
             return
@@ -261,6 +227,10 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
         session_id = session_result.ok()
+        if session_id is None:
+            logger.error("Failed to get session_id")
+            await message.channel.send(self.ERROR_MESSAGE)
+            return
 
         # Set session_id for note tool if it exists
         try:
@@ -269,15 +239,10 @@ class AgentCog(commands.Cog):
                 set_note_session_id,
             )
 
-            if session_id:  # Ensure session_id is not None
-                set_note_session_id(session_id)
-                logger.info(
-                    f"✅ Successfully set session_id {session_id} for note_wrapper_tool"
-                )
-            else:
-                logger.warning(
-                    "❌ session_id is None, cannot set for note_wrapper_tool"
-                )
+            set_note_session_id(session_id)
+            logger.info(
+                f"✅ Successfully set session_id {session_id} for note_wrapper_tool"
+            )
         except Exception as e:
             logger.error(
                 f"❌ Could not set session_id for note tool: {str(e)}", exc_info=True
@@ -287,28 +252,18 @@ class AgentCog(commands.Cog):
         user_info = self._format_user_info(message)
         enhanced_query = user_info + query
 
-        # Try to create Runner with error handling
-        try:
-            runner = Runner(
-                app_name=self.APP_NAME,
-                session_service=self.session_service,
-                agent=self.my_agent.get_agent(),
+        runner = Runner(
+            app_name=self.APP_NAME,
+            session_service=self.session_service,
+            agent=self.my_agent.get_agent(),
+        )
+        stream_result = await self.process_agent_stream_responses(
+            message, runner, enhanced_query, user_adk_id, session_id
+        )
+        if stream_result.is_err():
+            logger.error(
+                f"process_agent_stream_responses failed: {stream_result.err()}"
             )
-            logger.debug(f"Runner created successfully for app: {self.APP_NAME}")
-        except Exception as runner_error:
-            logger.error(f"Failed to create Runner: {str(runner_error)}", exc_info=True)
-            await message.channel.send("❌ 無法初始化對話系統，請稍後再試。")
-            return
-
-        # Ensure session_id is not None for process_agent_stream_responses
-        if session_id:
-            stream_result = await self.process_agent_stream_responses(
-                message, runner, enhanced_query, user_adk_id, session_id
-            )
-            if stream_result.is_err():
-                logger.error(
-                    f"process_agent_stream_responses failed: {stream_result.err()}"
-                )
 
     def check_clear_sessions_permission(
         self, ctx: commands.Context, target_user_id: Optional[str]
@@ -350,56 +305,21 @@ class AgentCog(commands.Cog):
             app_name=self.APP_NAME, user_id=user_adk_id
         )
         session_list = getattr(sessions_resp, "sessions", [])
-        if session_list is None:
-            session_list = []
         if not session_list:
             await ctx.send("未找到對話紀錄。")
             return
-
-        # Track session IDs for note deletion
-        session_ids_to_delete = []
-
         for session in session_list:
-            session_ids_to_delete.append(session.id)
             self.session_service.delete_session(
                 app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
             )
-
-        # Clear the cached session ID from memory
-        if user_adk_id in self.user_sessions:
-            del self.user_sessions[user_adk_id]
-            logger.info(f"Cleared cached session for user {user_adk_id}")
-
-        # Delete notes associated with these sessions
-        notes_deleted = 0
-        try:
-            from discord_agents.domain.tool_def.note_tool import note_tool
-
-            for session_id in session_ids_to_delete:
-                # Use the note tool's direct database access to delete notes by session_id
-                try:
-                    deleted_count = note_tool._delete_notes_by_session(session_id)
-                    notes_deleted += deleted_count
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to delete notes for session {session_id}: {str(e)}"
-                    )
-        except Exception as e:
-            logger.error(
-                f"Failed to delete notes during clear_sessions: {str(e)}", exc_info=True
-            )
-
-        if notes_deleted > 0:
-            await ctx.send(
-                f"已清除 {len(session_list)} 個對話紀錄和 {notes_deleted} 個筆記。"
-            )
-        else:
-            await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
+        await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
 
     @commands.command(name="info")
     async def info_command(self, ctx: commands.Context) -> None:
         tools = self.my_agent.tools
-        tools_str = "\n".join(str(t) for t in tools)
+        tools_str = (
+            "\n".join(str(t) for t in tools) if isinstance(tools, list) else str(tools)
+        )
         info_text = (
             f"**機器人名稱:** {self.my_agent.name}\n"
             f"**模型名稱:** {self.my_agent.model_name}\n"

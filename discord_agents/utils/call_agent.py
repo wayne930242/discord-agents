@@ -93,7 +93,6 @@ def _get_history_and_prompt(
     except Exception as e:
         logger.warning(f"Failed to get broker history: {e}")
         history_items = []
-
     history = [item["text"] for item in history_items]
     total_tokens = sum(item.get("tokens", 0) for item in history_items)
     query_tokens = count_tokens(query)
@@ -210,7 +209,11 @@ async def stream_agent_responses(
     if prompt_result.is_err():
         yield Err(MessageCenter.HISTORY_ERROR(prompt_result.err()))
         return
-    prompt, trimmed_flag, query_tokens = prompt_result.ok()  # type: ignore
+    result_tuple = prompt_result.ok()
+    if result_tuple is None:
+        yield Err("Failed to get prompt result")
+        return
+    prompt, trimmed_flag, query_tokens = result_tuple
     if trimmed_flag:
         yield Ok(MessageCenter.HISTORY_TRIMMED)
     try_content = None
@@ -223,22 +226,15 @@ async def stream_agent_responses(
     user_content = try_content
     full_response_text = ""
     final_response_yielded = False
-    try:
-        async for event in runner.run_async(
-            user_id=user_id, session_id=session_id, new_message=user_content
-        ):
-            try:
-                should_continue, yield_value, full_response_text, is_final = (
-                    _handle_event(event, only_final, full_response_text)
-                )
-                if yield_value is not None:
-                    yield Ok(yield_value)
-            except Exception as event_error:
-                logger.error(
-                    f"Error processing event: {str(event_error)}", exc_info=True
-                )
-                yield Err(MessageCenter.EVENT_ERROR(str(event_error)))
-                continue
+    async for event in runner.run_async(
+        user_id=user_id, session_id=session_id, new_message=user_content
+    ):
+        try:
+            should_continue, yield_value, full_response_text, is_final = _handle_event(
+                event, only_final, full_response_text
+            )
+            if yield_value is not None:
+                yield Ok(yield_value)
             if is_final and not final_response_yielded:
                 try:
                     broker_client.add_message_history(
@@ -255,16 +251,7 @@ async def stream_agent_responses(
                 return
             if not should_continue:
                 break
-    except KeyError as ke:
-        if "Context variable not found" in str(ke) and "memory" in str(ke):
-            logger.error(f"Memory context variable error: {ke}")
-            yield Err("❌ 系統配置錯誤：缺少記憶體變數設定。請聯繫管理員修復此問題。")
-            return
-        else:
-            logger.error(f"KeyError in runner.run_async: {ke}", exc_info=True)
-            yield Err(MessageCenter.EVENT_ERROR(str(ke)))
-            return
-    except Exception as runner_error:
-        logger.error(f"Error in runner.run_async: {runner_error}", exc_info=True)
-        yield Err(MessageCenter.EVENT_ERROR(str(runner_error)))
-        return
+        except Exception as event_error:
+            logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
+            yield Err(MessageCenter.EVENT_ERROR(str(event_error)))
+            continue

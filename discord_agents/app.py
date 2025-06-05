@@ -41,7 +41,7 @@ def init_admin(app: Flask) -> None:
         app,
         name="Discord Agents",
         template_mode="bootstrap4",
-        index_view=SecureAdminIndexView()
+        index_view=SecureAdminIndexView(),
     )
     admin.add_view(BotConfigView(BotModel, db.session))
     admin.add_view(BotManageView(name="Bot Manage", endpoint="botmanageview"))
