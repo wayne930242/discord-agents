@@ -1,11 +1,12 @@
 from flask_admin.contrib.sqla import ModelView
 from discord_agents.models.bot import db, BotModel, AgentModel
-from flask import request
+from flask import request, Response
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
 import re
+from typing import Any
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.tasks import should_restart_bot_task
@@ -15,14 +16,14 @@ from discord_agents.utils.auth import check_auth, authenticate
 logger = get_logger("bot_view")
 
 
-def validate_json(form, field):
+def validate_json(form: FlaskForm, field: Any) -> None:
     try:
         json.loads(field.data)
     except json.JSONDecodeError as e:
         raise ValidationError(f"Invalid JSON format: {str(e)}")
 
 
-def validate_agent_name(form, field):
+def validate_agent_name(form: FlaskForm, field: Any) -> None:
     """Validate that agent name is a valid identifier."""
     name = field.data
     if not name:
@@ -30,7 +31,7 @@ def validate_agent_name(form, field):
 
     # Check if name matches identifier pattern: starts with letter or underscore,
     # followed by letters, digits, or underscores
-    identifier_pattern = r'^[a-zA-Z_][a-zA-Z0-9_]*$'
+    identifier_pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
     if not re.match(identifier_pattern, name):
         raise ValidationError(
             "Agent name must be a valid identifier. It should start with a letter (a-z, A-Z) "
@@ -90,12 +91,14 @@ class BotConfigView(ModelView):
         "tools",
     ]
 
-    def is_accessible(self):
+    def is_accessible(self) -> bool:
         """Check if the current user is authenticated"""
         auth = request.authorization
-        return auth and check_auth(auth.username, auth.password)
+        if not auth or not auth.username or not auth.password:
+            return False
+        return check_auth(auth.username, auth.password)
 
-    def inaccessible_callback(self, name, **kwargs):
+    def inaccessible_callback(self, name: str, **kwargs: Any) -> Response:
         """Redirect to authentication if not accessible"""
         return authenticate()
 

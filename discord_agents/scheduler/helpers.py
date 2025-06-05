@@ -1,6 +1,6 @@
 from flask import Flask
 
-flask_app = None
+flask_app: Flask | None = None
 
 
 def get_flask_app() -> Flask:

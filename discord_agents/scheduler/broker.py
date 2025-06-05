@@ -4,14 +4,14 @@ from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional, Literal
 import json
-from redlock import Redlock
+from redlock import Redlock  # type: ignore
 import time
 
 logger = get_logger("broker")
 
 
 class BotRedisClient:
-    _instance = None
+    _instance: Optional["BotRedisClient"] = None
     _redlock: Redlock = None
     _client: Redis
 
@@ -31,7 +31,7 @@ class BotRedisClient:
     BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
     HISTORY_KEY = "history:{model}"
 
-    def __new__(cls):
+    def __new__(cls) -> "BotRedisClient":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._client = Redis.from_url(REDIS_URL, decode_responses=True)
@@ -55,11 +55,12 @@ class BotRedisClient:
         except Exception as e:
             logger.error(f"[Redis Error] set_state: {e}")
 
-    def _acquire_lock(self, lock_key: str, expire_ms: int = 10000):
+    def _acquire_lock(self, lock_key: str, expire_ms: int = 10000) -> bool:
         lock = self._redlock.lock(lock_key, expire_ms)
         if not lock:
             logger.warning(f"[Redlock] Failed to acquire lock: {lock_key}")
-        return lock
+            return False
+        return bool(lock)
 
     def set_should_start(
         self,
@@ -165,8 +166,8 @@ class BotRedisClient:
             logger.error(f"[Redis Error] get_all_running_bots: {e}")
         return bot_ids
 
-    def get_all_bot_status(self) -> dict[str, dict[str, str]]:
-        status = {}
+    def get_all_bot_status(self) -> dict[str, str]:
+        status: dict[str, str] = {}
         for bot_id in self.get_all_bots():
             status[bot_id] = self.get_state(bot_id)
         return status
@@ -212,8 +213,8 @@ class BotRedisClient:
         text: str,
         tokens: int,
         interval_seconds: float = 0.0,
-        timestamp: float = None,
-    ):
+        timestamp: Optional[float] = None,
+    ) -> None:
         if interval_seconds == 0 or timestamp is None or timestamp == float("inf"):
             return
         expire_at = timestamp + interval_seconds if interval_seconds > 0 else None
@@ -250,7 +251,7 @@ class BotRedisClient:
             logger.error(f"[Redis Error] get_message_history: {e}")
         return result
 
-    def prune_message_history(self, model: str):
+    def prune_message_history(self, model: str) -> None:
         key = self.HISTORY_KEY.format(model=model)
         now = time.time()
         try:

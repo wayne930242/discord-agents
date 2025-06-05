@@ -21,7 +21,12 @@ def requires_auth(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:
         auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
+        if (
+            not auth
+            or not auth.username
+            or not auth.password
+            or not check_auth(auth.username, auth.password)
+        ):
             return authenticate()
         return f(*args, **kwargs)
 

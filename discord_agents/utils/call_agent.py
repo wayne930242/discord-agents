@@ -1,7 +1,7 @@
 from google.genai import types
 from google.adk.runners import Runner
 from google.adk.events import Event
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Union
 from result import Result, Ok, Err
 import tiktoken
 import time
@@ -60,7 +60,9 @@ def count_tokens(text: str) -> int:
         return len(text)
 
 
-def trim_history(messages: list[str], max_tokens: int, model: Optional[str] = None):
+def trim_history(
+    messages: list[str], max_tokens: int, model: Optional[str] = None
+) -> tuple[list[str], bool]:
     RESERVED_TOKENS = 100  # Reserved tokens to avoid token limit issues
     if max_tokens == float("inf") or model is None:
         logger.info(f"Token count (no limit): {sum(count_tokens(m) for m in messages)}")
@@ -84,13 +86,14 @@ def trim_history(messages: list[str], max_tokens: int, model: Optional[str] = No
 
 
 def _get_history_and_prompt(
-    broker_client: BotRedisClient, model: str, query: str, max_tokens: int
+    broker_client: BotRedisClient, model: str, query: str, max_tokens: Union[int, float]
 ) -> Result[tuple[str, bool, int], str]:
     try:
         history_items = broker_client.get_message_history(model)
     except Exception as e:
         logger.warning(f"Failed to get broker history: {e}")
         history_items = []
+
     history = [item["text"] for item in history_items]
     total_tokens = sum(item.get("tokens", 0) for item in history_items)
     query_tokens = count_tokens(query)
@@ -190,7 +193,7 @@ async def stream_agent_responses(
     session_id: str,
     only_final: bool = True,
     model: Optional[str] = None,
-    max_tokens: int = float("inf"),
+    max_tokens: Union[int, float] = float("inf"),
     interval_seconds: float = 0.0,
 ) -> AsyncGenerator[Result[str, str], None]:
     logger.info(f"\n>>> User Query for user {user_id}, session {session_id}: {query}")
@@ -207,7 +210,7 @@ async def stream_agent_responses(
     if prompt_result.is_err():
         yield Err(MessageCenter.HISTORY_ERROR(prompt_result.err()))
         return
-    prompt, trimmed_flag, query_tokens = prompt_result.ok()
+    prompt, trimmed_flag, query_tokens = prompt_result.ok()  # type: ignore
     if trimmed_flag:
         yield Ok(MessageCenter.HISTORY_TRIMMED)
     try_content = None
@@ -224,16 +227,15 @@ async def stream_agent_responses(
         user_id=user_id, session_id=session_id, new_message=user_content
     ):
         try:
-            result = Ok(_handle_event(event, only_final, full_response_text))
+            should_continue, yield_value, full_response_text, is_final = _handle_event(
+                event, only_final, full_response_text
+            )
+            if yield_value is not None:
+                yield Ok(yield_value)
         except Exception as event_error:
             logger.error(f"Error processing event: {str(event_error)}", exc_info=True)
-            result = Err(MessageCenter.EVENT_ERROR(str(event_error)))
-        if result.is_err():
-            yield result
+            yield Err(MessageCenter.EVENT_ERROR(str(event_error)))
             continue
-        should_continue, yield_value, full_response_text, is_final = result.ok()
-        if yield_value is not None:
-            yield Ok(yield_value)
         if is_final and not final_response_yielded:
             try:
                 broker_client.add_message_history(

@@ -18,6 +18,8 @@ def summarize_content(
             "message": f"Content saved for summarization (word count: {word_count}). Ready to generate a {summary_length} summary.",
             "word_count": word_count,
         }
+    # For mypy
+    return {"status": "error", "message": "No tool context provided"}
 
 
 def create_summarizer_agent() -> Agent:

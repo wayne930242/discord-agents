@@ -72,9 +72,14 @@ class AgentCog(commands.Cog):
         user_adk_id: str,
         session_id: str,
     ) -> Result[None, str]:
-        async def send_chunks(content: str):
-            cleaned_content = content.replace("<start_of_audio>", "").replace("<end_of_audio>", "")
-            for chunk in [cleaned_content[i : i + 2000] for i in range(0, len(cleaned_content), 2000)]:
+        async def send_chunks(content: str) -> None:
+            cleaned_content = content.replace("<start_of_audio>", "").replace(
+                "<end_of_audio>", ""
+            )
+            for chunk in [
+                cleaned_content[i : i + 2000]
+                for i in range(0, len(cleaned_content), 2000)
+            ]:
                 if chunk.strip():
                     await message.channel.send(chunk)
 
@@ -86,14 +91,18 @@ class AgentCog(commands.Cog):
                 session_id=session_id,
                 only_final=True,
                 model=self.my_agent.model_name,
-                max_tokens=self.my_agent.max_tokens,
+                max_tokens=int(self.my_agent.max_tokens),
                 interval_seconds=self.my_agent.interval_seconds,
             ):
                 if part_result.is_err():
-                    await message.channel.send(part_result.err())
-                    return Err(part_result.err())
+                    error_msg = part_result.err()
+                    if error_msg:
+                        await message.channel.send(error_msg)
+                    return Err(error_msg or "Unknown error")
                 try:
-                    await send_chunks(part_result.ok())
+                    result_content = part_result.ok()
+                    if result_content:
+                        await send_chunks(result_content)
                 except discord.HTTPException as http_error:
                     logger.error(
                         f"Discord HTTP error while sending message: {str(http_error)}",
@@ -120,7 +129,9 @@ class AgentCog(commands.Cog):
         self, message: discord.Message
     ) -> Result[tuple[str, str], str]:
         # Bots or non-supported channels are rejected
-        if message.author.bot or not isinstance(message.channel, (discord.DMChannel, discord.TextChannel)):
+        if message.author.bot or not isinstance(
+            message.channel, (discord.DMChannel, discord.TextChannel)
+        ):
             return Err("Not a valid message")
 
         # Check DM or TextChannel and whitelist
@@ -145,33 +156,41 @@ class AgentCog(commands.Cog):
         if is_dm:
             query = message.content.strip()
         elif self.bot.user and self.bot.user in message.mentions:
-            query = re.sub(rf"<@!?{self.bot.user.id}>", "", message.content, count=1).strip()
+            query = re.sub(
+                rf"<@!?{self.bot.user.id}>", "", message.content, count=1
+            ).strip()
         if not query:
             return Err("Query content is empty")
 
         # Get user_adk_id
-        user_adk_id = self._get_user_adk_id(message)
-        if user_adk_id.is_err():
-            return Err(f"Failed to get user_adk_id: {user_adk_id.err()}")
-        return Ok((query, user_adk_id.ok()))
+        user_adk_id_result = self._get_user_adk_id(message)
+        if user_adk_id_result.is_err():
+            return Err(f"Failed to get user_adk_id: {user_adk_id_result.err()}")
+        user_adk_id: str = user_adk_id_result.ok()  # type: ignore
+        return Ok((query, user_adk_id))
 
     def _format_user_info(self, message: discord.Message) -> str:
         """Format user information for the agent context."""
-        user_info_parts = []
+        user_info_parts: list[str] = []
 
         # Basic user info
         user_info_parts.append(f"User ID: {message.author.id}")
         user_info_parts.append(f"Username: {message.author.name}")
 
         # Global display name (if set)
-        if hasattr(message.author, 'global_name') and message.author.global_name:
+        if hasattr(message.author, "global_name") and message.author.global_name:
             user_info_parts.append(f"Global Display Name: {message.author.global_name}")
 
         # Server-specific display name (if different from username and global name)
         if message.author.display_name != message.author.name:
             # Check if it's different from global_name too
-            if not hasattr(message.author, 'global_name') or message.author.display_name != message.author.global_name:
-                user_info_parts.append(f"Server Display Name: {message.author.display_name}")
+            if (
+                not hasattr(message.author, "global_name")
+                or message.author.display_name != message.author.global_name
+            ):
+                user_info_parts.append(
+                    f"Server Display Name: {message.author.display_name}"
+                )
 
         # Channel context
         if isinstance(message.channel, discord.DMChannel):
@@ -191,7 +210,7 @@ class AgentCog(commands.Cog):
         result = self.parse_message_query(message)
         if result.is_err():
             return
-        query, user_adk_id = result.ok()
+        query, user_adk_id = result.ok()  # type: ignore
         if not query:
             logger.debug("Query is empty after parse_message_query.")
             return
@@ -206,8 +225,12 @@ class AgentCog(commands.Cog):
 
         # Set session_id for note tool if it exists
         try:
-            from discord_agents.domain.tool_def.note_wrapper_tool import note_wrapper_tool
-            note_wrapper_tool.set_session_id(session_id)
+            from discord_agents.domain.tool_def.note_wrapper_tool import (
+                note_wrapper_tool,
+            )
+
+            if session_id:  # Ensure session_id is not None
+                note_wrapper_tool.set_session_id(session_id)
         except Exception as e:
             logger.debug(f"Could not set session_id for note tool: {str(e)}")
 
@@ -220,16 +243,18 @@ class AgentCog(commands.Cog):
             session_service=self.session_service,
             agent=self.my_agent.get_agent(),
         )
-        stream_result = await self.process_agent_stream_responses(
-            message, runner, enhanced_query, user_adk_id, session_id
-        )
-        if stream_result.is_err():
-            logger.error(
-                f"process_agent_stream_responses failed: {stream_result.err()}"
+        # Ensure session_id is not None for process_agent_stream_responses
+        if session_id:
+            stream_result = await self.process_agent_stream_responses(
+                message, runner, enhanced_query, user_adk_id, session_id
             )
+            if stream_result.is_err():
+                logger.error(
+                    f"process_agent_stream_responses failed: {stream_result.err()}"
+                )
 
     def check_clear_sessions_permission(
-        self, ctx, target_user_id: Optional[str]
+        self, ctx: commands.Context, target_user_id: Optional[str]
     ) -> bool:
         is_self = (not target_user_id) or (str(ctx.author.id) == str(target_user_id))
         is_admin = False
@@ -238,28 +263,38 @@ class AgentCog(commands.Cog):
         return is_self or is_admin
 
     @commands.command(name="clear_sessions")
-    async def clear_sessions(self, ctx, target_user_id: Optional[str] = None):
+    async def clear_sessions(
+        self, ctx: commands.Context, target_user_id: Optional[str] = None
+    ) -> None:
         if not self.check_clear_sessions_permission(ctx, target_user_id):
             await ctx.send("你沒有權限清除其他人的對話紀錄。")
             return
         if target_user_id:
             if target_user_id.startswith("channel_"):
-                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=target_user_id[8:])
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(
+                    channel_id=target_user_id[8:]
+                )
             elif target_user_id.startswith("dm_"):
-                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id[3:])
+                user_adk_id = AgentCog.USER_DM_TEMPLATE.format(
+                    user_id=target_user_id[3:]
+                )
             else:
                 user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=target_user_id)
         else:
             if isinstance(ctx.channel, discord.DMChannel):
                 user_adk_id = AgentCog.USER_DM_TEMPLATE.format(user_id=ctx.author.id)
             elif isinstance(ctx.channel, discord.TextChannel):
-                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(channel_id=ctx.channel.id)
+                user_adk_id = AgentCog.CHANNEL_TEMPLATE.format(
+                    channel_id=ctx.channel.id
+                )
             else:
                 user_adk_id = f"discord_unknown_{ctx.author.id}"
         sessions_resp = self.session_service.list_sessions(
             app_name=self.APP_NAME, user_id=user_adk_id
         )
         session_list = getattr(sessions_resp, "sessions", [])
+        if session_list is None:
+            session_list = []
         if not session_list:
             await ctx.send("未找到對話紀錄。")
             return
@@ -270,12 +305,9 @@ class AgentCog(commands.Cog):
         await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
 
     @commands.command(name="info")
-    async def info_command(self, ctx):
+    async def info_command(self, ctx: commands.Context) -> None:
         tools = self.my_agent.tools
-        if isinstance(tools, list):
-            tools_str = "\n".join(str(t) for t in tools)
-        else:
-            tools_str = str(tools)
+        tools_str = "\n".join(str(t) for t in tools)
         info_text = (
             f"**機器人名稱:** {self.my_agent.name}\n"
             f"**模型名稱:** {self.my_agent.model_name}\n"
@@ -286,7 +318,7 @@ class AgentCog(commands.Cog):
             await ctx.send(chunk)
 
     @commands.command(name="help")
-    async def help_command(self, ctx):
+    async def help_command(self, ctx: commands.Context) -> None:
         help_text = (
             "**所有指令:**\n"
             f"`{self.bot.command_prefix}help` - 顯示此幫助訊息\n"

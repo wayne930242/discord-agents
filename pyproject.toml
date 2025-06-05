@@ -46,4 +46,6 @@ dev = [
     "mypy>=1.16.0",
     "types-psycopg2>=2.9.21.20250516",
     "types-pytz>=2025.2.0.20250516",
+    "types-redis>=4.6.0.20241004",
+    "types-wtforms>=3.2.1.20250602",
 ]

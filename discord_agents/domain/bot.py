@@ -34,13 +34,20 @@ class MyBot:
         )
         self._dm_whitelist = self._init_dm_whitelist(config.get("dm_whitelist"))
         self._srv_whitelist = self._init_srv_whitelist(config.get("srv_whitelist"))
-        self._cog = None
+        self._cog: Optional[AgentCog] = None
         intents = self._init_intents()
         self._bot = self._init_bot(self._command_prefix, intents)
-        self._bot.on_ready = self._on_ready
+
+        # Use proper event handler assignment
+        @self._bot.event
+        async def on_ready() -> None:
+            result = await self._on_ready()
+            if result.is_err():
+                logger.error(f"Error in on_ready: {result.err()}")
+
         self.bot_id = config["bot_id"]
         logger.info(
-            f"MyBot initialization completed for token ending with: ...{self._token[-4:] if len(self._token) > 4 else self._token}"
+            f"MyBot initialization completed for token ending with: ...{self._token[-4:] if self._token and len(self._token) > 4 else self._token}"
         )
 
     def _validate_token(self, token: str) -> Result[str, str]:
@@ -54,7 +61,7 @@ class MyBot:
         return prefix
 
     def _init_dm_whitelist(self, dm_whitelist: Optional[list[str]]) -> list[str]:
-        wl = []
+        wl: list[str] = []
         if dm_whitelist:
             wl.extend(str(id_val) for id_val in dm_whitelist if id_val is not None)
         if DM_ID_WHITE_LIST:
@@ -64,7 +71,7 @@ class MyBot:
         return wl
 
     def _init_srv_whitelist(self, srv_whitelist: Optional[list[str]]) -> list[str]:
-        wl = []
+        wl: list[str] = []
         if srv_whitelist:
             wl.extend(str(id_val) for id_val in srv_whitelist if id_val is not None)
         if SERVER_ID_WHITE_LIST:
@@ -139,6 +146,8 @@ class MyBot:
     async def run(self) -> Result[None, str]:
         logger.info("Starting bot...")
         try:
+            if not self._token:
+                return Err("Token is not set")
             await self._bot.start(self._token)
             return Ok(None)
         except Exception as e:
@@ -158,4 +167,6 @@ class MyBot:
             return Err(str(e))
 
     def get_my_agent(self) -> MyAgent:
+        if not self._cog:
+            raise ValueError("Cog is not initialized")
         return self._cog.my_agent

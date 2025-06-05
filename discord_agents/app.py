@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from flask import Flask, redirect, url_for, request
 from flask_admin import Admin, AdminIndexView
 from discord_agents.env import DATABASE_URL, SECRET_KEY
@@ -15,24 +16,26 @@ logger = get_logger("app")
 class SecureAdminIndexView(AdminIndexView):
     """Custom AdminIndexView with authentication"""
 
-    def is_accessible(self):
+    def is_accessible(self) -> bool:
         """Check if the current user is authenticated"""
         auth = request.authorization
-        return auth and check_auth(auth.username, auth.password)
+        if not auth or not auth.username or not auth.password:
+            return False
+        return check_auth(auth.username, auth.password)
 
-    def inaccessible_callback(self, name, **kwargs):
+    def inaccessible_callback(self, name: str, **kwargs: Any):  # type: ignore
         """Redirect to authentication if not accessible"""
         return authenticate()
 
 
-def init_db(app: Flask):
+def init_db(app: Flask) -> None:
     db.init_app(app)
     with app.app_context():
         db.create_all()
         logger.info("Database initialized successfully")
 
 
-def init_admin(app: Flask):
+def init_admin(app: Flask) -> None:
     logger.info("Initializing admin interface...")
     admin = Admin(
         app,
@@ -57,12 +60,12 @@ def create_app() -> Flask:
         logger.info("BotManager monitor thread started.")
 
         @app.route("/health")
-        def health_check():
+        def health_check() -> tuple[str, int]:
             return "OK", 200
 
         @app.route("/")
         @requires_auth
-        def index():
+        def index():  # type: ignore
             return redirect(url_for("admin.index"))
 
         template_dir = os.path.join(

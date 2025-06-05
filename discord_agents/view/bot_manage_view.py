@@ -3,41 +3,53 @@ from flask import flash, redirect, url_for, request
 from discord_agents.utils.logger import get_logger
 from discord_agents.utils.auth import check_auth, authenticate
 import json
+from typing import Optional, Any
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 logger = get_logger("bot_manage_view")
 
 
 class BotManageView(BaseView):
-    def __init__(self, name=None, endpoint=None, *args, **kwargs):
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(name=name, endpoint=endpoint, *args, **kwargs)
         logger.info("BotManagementView initialized")
 
-    def is_accessible(self):
+    def is_accessible(self) -> bool:
         """Check if the current user is authenticated"""
         auth = request.authorization
-        return auth and check_auth(auth.username, auth.password)
+        if not auth or not auth.username or not auth.password:
+            return False
+        return check_auth(auth.username, auth.password)
 
-    def inaccessible_callback(self, name, **kwargs):
+    def inaccessible_callback(self, name: str, **kwargs: Any):  # type: ignore
         """Redirect to authentication if not accessible"""
         return authenticate()
 
-    @expose("/")
-    def index(self):
+    @expose("/")  # type: ignore
+    def index(self) -> Any:
         logger.info("Visit Bot Management page")
         from discord_agents.scheduler.broker import BotRedisClient
 
         redis_broker = BotRedisClient()
         result = redis_broker.get_all_bot_status()
         logger.info(f"Bot status result: {result}")
-        running_bots = []
-        not_running_bots = []
+        running_bots: list[str] = []
+        not_running_bots: list[str] = []
         error_message = request.args.get("error")
         for bot_id, info in result.items():
             is_running = False
             try:
+                # Try to parse as JSON first
                 info_dict = json.loads(info)
                 is_running = info_dict.get("running", False)
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
+                # If not JSON, check if it's directly "running"
                 if info == "running":
                     is_running = True
             if is_running:
@@ -52,8 +64,8 @@ class BotManageView(BaseView):
             error_message=error_message,
         )
 
-    @expose("/start/<bot_id>")
-    def start_bot(self, bot_id):
+    @expose("/start/<bot_id>")  # type: ignore
+    def start_bot(self, bot_id: str) -> WerkzeugResponse:
         from discord_agents.scheduler.tasks import should_start_bot_in_model_task
 
         logger.info(f"Receive request to start bot {bot_id}")
@@ -71,8 +83,8 @@ class BotManageView(BaseView):
                 )
             )
 
-    @expose("/stop/<bot_id>")
-    def stop_bot(self, bot_id):
+    @expose("/stop/<bot_id>")  # type: ignore
+    def stop_bot(self, bot_id: str) -> WerkzeugResponse:
         from discord_agents.scheduler.tasks import should_stop_bot_task
 
         logger.info(f"Receive request to stop bot {bot_id}")
@@ -90,8 +102,8 @@ class BotManageView(BaseView):
                 )
             )
 
-    @expose("/start-all")
-    def start_all_bots(self):
+    @expose("/start-all")  # type: ignore
+    def start_all_bots(self) -> WerkzeugResponse:
         from discord_agents.scheduler.tasks import should_start_all_bots_in_model_task
 
         logger.info("Receive request to start all bots")
@@ -109,8 +121,8 @@ class BotManageView(BaseView):
                 )
             )
 
-    @expose("/stop-all")
-    def stop_all_bots(self):
+    @expose("/stop-all")  # type: ignore
+    def stop_all_bots(self) -> WerkzeugResponse:
         from discord_agents.scheduler.tasks import should_stop_all_bots_task
 
         logger.info("Receive request to stop all bots")

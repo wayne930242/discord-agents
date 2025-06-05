@@ -4,7 +4,7 @@ from google.adk.models.lite_llm import LiteLlm
 from datetime import datetime
 from typing import Optional, Union, List
 from enum import Enum
-import pytz  # type: ignore
+import pytz
 
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
@@ -144,7 +144,7 @@ class LLMs:
     def get_restrictions(model_name: str) -> tuple[float, float]:
         for llm in LLMs.llm_list:
             if llm["model"] == model_name:
-                restrictions = llm.get("restrictions", {})  # type: ignore
+                restrictions = llm.get("restrictions", {})
                 return restrictions.get("max_tokens", float("inf")), restrictions.get(  # type: ignore
                     "interval_seconds", 0.0
                 )
@@ -189,10 +189,10 @@ class MyAgent:
         self.instructions = f"{user_info_instructions}{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
 
         if tools and all(isinstance(t, str) for t in tools):
-            self.tool_names = tools
+            self.tool_names: List[str] = tools
             self.tools = Tools.get_tools(tools)
         else:
-            self.tool_names: List[str] = []
+            self.tool_names = []
             self.tools = tools or []
 
         self._llm_type = LLMs.find_model_type(model_name)
