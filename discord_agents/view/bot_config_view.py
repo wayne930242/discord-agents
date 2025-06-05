@@ -5,6 +5,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
 import json
+import re
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
 from discord_agents.scheduler.tasks import should_restart_bot_task
@@ -19,6 +20,22 @@ def validate_json(form, field):
         json.loads(field.data)
     except json.JSONDecodeError as e:
         raise ValidationError(f"Invalid JSON format: {str(e)}")
+
+
+def validate_agent_name(form, field):
+    """Validate that agent name is a valid identifier."""
+    name = field.data
+    if not name:
+        return  # Let DataRequired handle empty values
+
+    # Check if name matches identifier pattern: starts with letter or underscore,
+    # followed by letters, digits, or underscores
+    identifier_pattern = r'^[a-zA-Z_][a-zA-Z0-9_]*$'
+    if not re.match(identifier_pattern, name):
+        raise ValidationError(
+            "Agent name must be a valid identifier. It should start with a letter (a-z, A-Z) "
+            "or an underscore (_), and can only contain letters, digits (0-9), and underscores."
+        )
 
 
 class BotConfigForm(FlaskForm):
@@ -37,7 +54,7 @@ class BotConfigForm(FlaskForm):
     )
 
     # Agent fields
-    name = StringField("Agent Name", validators=[DataRequired()])
+    name = StringField("Agent Name", validators=[DataRequired(), validate_agent_name])
     description = TextAreaField("Description", validators=[DataRequired()])
     role_instructions = TextAreaField("Role Instructions", validators=[DataRequired()])
     tool_instructions = TextAreaField("Tool Instructions", validators=[DataRequired()])
