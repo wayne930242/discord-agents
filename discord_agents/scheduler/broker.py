@@ -2,7 +2,7 @@ from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
-from typing import Optional, Literal
+from typing import Optional, Literal, Any
 import json
 from redlock import Redlock  # type: ignore
 import time
@@ -55,12 +55,13 @@ class BotRedisClient:
         except Exception as e:
             logger.error(f"[Redis Error] set_state: {e}")
 
-    def _acquire_lock(self, lock_key: str, expire_ms: int = 10000) -> bool:
+    def _acquire_lock(self, lock_key: str, expire_ms: int = 10000) -> Any:
+        """Acquire a distributed lock and return the lock object or None if failed"""
         lock = self._redlock.lock(lock_key, expire_ms)
         if not lock:
             logger.warning(f"[Redlock] Failed to acquire lock: {lock_key}")
-            return False
-        return bool(lock)
+            return None
+        return lock
 
     def set_should_start(
         self,
