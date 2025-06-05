@@ -40,3 +40,10 @@ build-backend = "hatchling.build"
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.16.0",
+    "types-psycopg2>=2.9.21.20250516",
+    "types-pytz>=2025.2.0.20250516",
+]

@@ -3,7 +3,7 @@ from flask import Flask, redirect, url_for, request
 from flask_admin import Admin, AdminIndexView
 from discord_agents.env import DATABASE_URL, SECRET_KEY
 from discord_agents.utils.logger import get_logger
-from discord_agents.models.bot import db, BotModel
+from discord_agents.models.bot import db, BotModel, NoteModel
 from discord_agents.view.bot_config_view import BotConfigView
 from discord_agents.view.bot_manage_view import BotManageView
 from discord_agents.utils.auth import requires_auth, check_auth, authenticate

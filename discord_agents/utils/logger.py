@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+from typing import Union
 
 # ANSI escape sequences for colored log level names
 RESET = "\x1b[0m"
@@ -32,7 +33,7 @@ def get_logger(name: str) -> logging.Logger:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.DEBUG)
         if console_handler.stream.isatty():
-            formatter = ColoredFormatter(log_fmt, datefmt=date_fmt)
+            formatter: Union[ColoredFormatter, logging.Formatter] = ColoredFormatter(log_fmt, datefmt=date_fmt)
         else:
             formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
         console_handler.setFormatter(formatter)

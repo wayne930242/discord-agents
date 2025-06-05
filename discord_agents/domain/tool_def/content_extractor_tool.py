@@ -2,16 +2,17 @@ from google.adk import Agent
 from google.adk.tools import FunctionTool
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
+from typing import Dict, Any
 
 try:
-    from crawl4ai import AsyncWebCrawler
+    from crawl4ai import AsyncWebCrawler  # type: ignore
 except ImportError:
     AsyncWebCrawler = None
 
 
 async def _extract_content_from_url(
     url: str, include_headers: bool = True, tool_context: ToolContext = None
-) -> dict:
+) -> Dict[str, Any]:
     """
     Wrapper for async extract_content_from_url.
     """
@@ -22,7 +23,7 @@ async def _extract_content_from_url(
 
 async def extract_content_from_url(
     url: str, include_headers: bool = True, tool_context: ToolContext = None
-) -> dict:
+) -> Dict[str, Any]:
     try:
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(url=url, include_headers=include_headers)
@@ -67,7 +68,7 @@ async def extract_content_from_url(
         return {"status": "error", "url": url, "error_message": str(e)}
 
 
-def create_content_extractor_agent():
+def create_content_extractor_agent() -> Agent:
     extract_content_tool = FunctionTool(func=_extract_content_from_url)
     extractor_agent = Agent(
         name="content_extractor",

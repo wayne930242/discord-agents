@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, DateTime, Index
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 
 from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
@@ -67,3 +68,21 @@ class BotModel(db.Model):
         my_bot.setup_my_agent(self.to_setup_agent_config())
 
         return my_bot
+
+
+class NoteModel(db.Model):
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    tags = Column(JSON, default=list)  # Store tags list
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Create index for session_id to improve query performance
+    __table_args__ = (
+        Index('ix_notes_session_id', 'session_id'),
+        Index('ix_notes_created_at', 'created_at'),
+    )

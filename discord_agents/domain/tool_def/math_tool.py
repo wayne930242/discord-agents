@@ -1,7 +1,7 @@
 from google.adk import Agent
 from google.adk.tools.agent_tool import AgentTool
 import math
-import numexpr
+import numexpr  # type: ignore
 
 AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
 
@@ -30,7 +30,7 @@ def calculator(expression: str) -> str:
         return f"Calculation error: {e}"
 
 
-def create_math_agent():
+def create_math_agent() -> Agent:
     math_agent = Agent(
         name="math_agent",
         model=AGENT_MODEL,

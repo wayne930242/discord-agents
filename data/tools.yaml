@@ -1,0 +1,139 @@
+# Note: This tools.yaml file is currently for documentation purposes.
+# The note tool implementation uses direct SQL queries instead of MCP Toolbox server.
+# This file can be used if you want to set up a proper MCP Toolbox server in the future.
+
+sources:
+  notes-db-source:
+    kind: postgres
+    host: ${DB_HOST}
+    port: ${DB_PORT}
+    database: ${DB_NAME}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+tools:
+  create-note:
+    kind: postgres-sql
+    source: notes-db-source
+    description: Create a new note for a session
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID for the note
+      - name: title
+        type: string
+        description: The title of the note
+      - name: content
+        type: string
+        description: The content of the note
+      - name: tags
+        type: string
+        description: Optional tags in JSON format (e.g., '["tag1", "tag2"]')
+        default: '[]'
+    statement: |
+      INSERT INTO notes (session_id, title, content, tags, created_at, updated_at)
+      VALUES ($1, $2, $3, $4::json, NOW(), NOW())
+      RETURNING id, title, created_at;
+
+  list-notes:
+    kind: postgres-sql
+    source: notes-db-source
+    description: List all notes for a session
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID to list notes for
+    statement: |
+      SELECT id, title, content, tags, created_at, updated_at
+      FROM notes
+      WHERE session_id = $1
+      ORDER BY created_at DESC;
+
+  get-note:
+    kind: postgres-sql
+    source: notes-db-source
+    description: Get a specific note by ID and session
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID
+      - name: note_id
+        type: string
+        description: The note ID to retrieve
+    statement: |
+      SELECT id, title, content, tags, created_at, updated_at
+      FROM notes
+      WHERE session_id = $1 AND id = $2;
+
+  update-note:
+    kind: postgres-sql
+    source: notes-db-source
+    description: Update an existing note
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID
+      - name: note_id
+        type: string
+        description: The note ID to update
+      - name: title
+        type: string
+        description: The new title (optional, use empty string to keep current)
+      - name: content
+        type: string
+        description: The new content (optional, use empty string to keep current)
+      - name: tags
+        type: string
+        description: New tags in JSON format (optional, use empty string to keep current)
+    statement: |
+      UPDATE notes
+      SET
+        title = CASE WHEN $3 != '' THEN $3 ELSE title END,
+        content = CASE WHEN $4 != '' THEN $4 ELSE content END,
+        tags = CASE WHEN $5 != '' THEN $5::json ELSE tags END,
+        updated_at = NOW()
+      WHERE session_id = $1 AND id = $2
+      RETURNING id, title, updated_at;
+
+  delete-note:
+    kind: postgres-sql
+    source: notes-db-source
+    description: Delete a note by ID and session
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID
+      - name: note_id
+        type: string
+        description: The note ID to delete
+    statement: |
+      DELETE FROM notes
+      WHERE session_id = $1 AND id = $2
+      RETURNING id, title;
+
+  search-notes:
+    kind: postgres-sql
+    source: notes-db-source
+    description: Search notes by title or content
+    parameters:
+      - name: session_id
+        type: string
+        description: The session ID to search in
+      - name: query
+        type: string
+        description: Search query for title or content
+    statement: |
+      SELECT id, title, content, tags, created_at, updated_at
+      FROM notes
+      WHERE session_id = $1
+      AND (title ILIKE '%' || $2 || '%' OR content ILIKE '%' || $2 || '%')
+      ORDER BY created_at DESC;
+
+toolsets:
+  notes-toolset:
+    - create-note
+    - list-notes
+    - get-note
+    - update-note
+    - delete-note
+    - search-notes

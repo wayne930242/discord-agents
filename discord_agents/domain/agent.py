@@ -2,9 +2,9 @@ from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Union, List
 from enum import Enum
-import pytz
+import pytz  # type: ignore
 
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
@@ -127,25 +127,25 @@ class LLMs:
     def find_model_type(model_name: str) -> Optional[LLM_TYPE]:
         for llm in LLMs.llm_list:
             if llm["model"] == model_name:
-                return llm["agent"]
+                return llm["agent"]  # type: ignore
         return None
 
     @staticmethod
-    def get_model_names() -> list[str]:
-        return [llm["model"] for llm in LLMs.llm_list]
+    def get_model_names() -> List[str]:
+        return [llm["model"] for llm in LLMs.llm_list]  # type: ignore
 
     @staticmethod
-    def get_models_below_price(max_price: float) -> list[str]:
+    def get_models_below_price(max_price: float) -> List[str]:
         return [
-            llm["model"] for llm in LLMs.llm_list if llm["price_per_1M"] < max_price
+            llm["model"] for llm in LLMs.llm_list if llm["price_per_1M"] < max_price  # type: ignore
         ]
 
     @staticmethod
-    def get_restrictions(model_name: str) -> tuple[int, int]:
+    def get_restrictions(model_name: str) -> tuple[float, float]:
         for llm in LLMs.llm_list:
             if llm["model"] == model_name:
-                restrictions = llm.get("restrictions", {})
-                return restrictions.get("max_tokens", float("inf")), restrictions.get(
+                restrictions = llm.get("restrictions", {})  # type: ignore
+                return restrictions.get("max_tokens", float("inf")), restrictions.get(  # type: ignore
                     "interval_seconds", 0.0
                 )
         return float("inf"), 0.0
@@ -161,7 +161,7 @@ class MyAgent:
         role_instructions: str,
         tool_instructions: str,
         model_name: str,
-        tools: Optional[Union[list[str]]] = None,
+        tools: Optional[Union[List[str]]] = None,
     ):
         if tools is None:
             tools = []
@@ -192,7 +192,7 @@ class MyAgent:
             self.tool_names = tools
             self.tools = Tools.get_tools(tools)
         else:
-            self.tool_names = []
+            self.tool_names: List[str] = []
             self.tools = tools or []
 
         self._llm_type = LLMs.find_model_type(model_name)
@@ -220,10 +220,10 @@ class MyAgent:
     def get_agent(self) -> Agent:
         return self.agent
 
-    def gemini_model(self):
+    def gemini_model(self) -> str:
         return self.model_name
 
-    def lite_model(self):
+    def lite_model(self) -> LiteLlm:
         return LiteLlm(model=self.model_name)
 
     def get_info(self) -> tuple[str, str, str, str]:
@@ -235,7 +235,7 @@ class MyAgent:
         )
 
     @staticmethod
-    def get_time_instructions():
+    def get_time_instructions() -> str:
         timezone = pytz.timezone("Asia/Taipei")
         current_time = datetime.now(timezone)
         time_instructions = f"The current time is {current_time.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Taipei)."

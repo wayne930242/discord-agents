@@ -8,7 +8,7 @@ from discord_agents.env import TAVILY_API_KEY
 AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
 
 
-def create_search_agent():
+def create_search_agent() -> Agent:
     tavily_api_key = TAVILY_API_KEY
     if not tavily_api_key:
         raise ValueError("TAVILY_API_KEY not found in environment variables")

@@ -7,12 +7,12 @@ from google.adk.tools import FunctionTool
 AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
 
 
-def dice_tool(dice_count: int, dice_sides: int):
+def dice_tool(dice_count: int, dice_sides: int) -> int:
     """Use this tool to roll a dice."""
     return random.randint(1, dice_sides) * dice_count
 
 
-def create_life_env_agent():
+def create_life_env_agent() -> Agent:
     dice_tool_fn = FunctionTool(func=dice_tool)
 
     life_env_agent = Agent(

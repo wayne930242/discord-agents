@@ -1,11 +1,12 @@
 from google.adk import Agent
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
+from typing import Dict
 
 
 def summarize_content(
     content: str, summary_length: str, tool_context: ToolContext = None
-) -> dict:
+) -> Dict[str, object]:
     if not summary_length:
         summary_length = "medium"
     if tool_context:
@@ -19,7 +20,7 @@ def summarize_content(
         }
 
 
-def create_summarizer_agent():
+def create_summarizer_agent() -> Agent:
     summarizer_agent = Agent(
         name="summarizer",
         model="gemini-2.5-flash-preview-04-17",

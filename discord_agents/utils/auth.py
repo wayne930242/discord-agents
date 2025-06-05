@@ -1,7 +1,7 @@
 from flask import Response, request
 from functools import wraps
 from discord_agents.env import ADMIN_USERNAME, ADMIN_PASSWORD
-from typing import Callable
+from typing import Callable, Any
 
 
 def check_auth(username: str, password: str) -> bool:
@@ -17,9 +17,9 @@ def authenticate() -> Response:
     )
 
 
-def requires_auth(f: Callable) -> Callable:
+def requires_auth(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
-    def decorated(*args, **kwargs):
+    def decorated(*args: Any, **kwargs: Any) -> Any:
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
             return authenticate()

@@ -204,6 +204,13 @@ class AgentCog(commands.Cog):
             return
         session_id = session_result.ok()
 
+        # Set session_id for note tool if it exists
+        try:
+            from discord_agents.domain.tool_def.note_wrapper_tool import note_wrapper_tool
+            note_wrapper_tool.set_session_id(session_id)
+        except Exception as e:
+            logger.debug(f"Could not set session_id for note tool: {str(e)}")
+
         # Format user info and prepend to query
         user_info = self._format_user_info(message)
         enhanced_query = user_info + query

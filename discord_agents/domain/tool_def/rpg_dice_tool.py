@@ -1,8 +1,9 @@
 import random
 from google.adk.tools import FunctionTool
+from typing import Dict
 
 
-def dice_tool(dice_count: int, dice_sides: int):
+def dice_tool(dice_count: int, dice_sides: int) -> Dict[str, object]:
     """
     Roll a specified number of dice with a given number of sides.
 
