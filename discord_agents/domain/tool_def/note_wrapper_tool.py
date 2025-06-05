@@ -7,6 +7,7 @@ logger = get_logger("note_wrapper_tool")
 
 # Global variable to store current session ID
 _current_session_id: Optional[str] = None
+_current_user_adk_id: Optional[str] = None
 
 
 def set_note_session_id(session_id: str) -> None:
@@ -14,6 +15,57 @@ def set_note_session_id(session_id: str) -> None:
     global _current_session_id
     _current_session_id = session_id
     logger.info(f"📝 Set global session_id: {session_id}")
+
+
+def set_note_user_adk_id(user_adk_id: str) -> None:
+    """Set the current user ADK ID for session recovery"""
+    global _current_user_adk_id
+    _current_user_adk_id = user_adk_id
+    logger.debug(f"📝 Set global user_adk_id: {user_adk_id}")
+
+
+def _recover_session_id() -> Optional[str]:
+    """Try to recover session_id by finding the latest session for current user"""
+    global _current_user_adk_id
+
+    if not _current_user_adk_id:
+        logger.warning("📝 Cannot recover session_id: no user_adk_id available")
+        return None
+
+    try:
+        # Import here to avoid circular imports
+        from google.adk.sessions import DatabaseSessionService
+        from discord_agents.env import DATABASE_URL
+
+        session_service = DatabaseSessionService(DATABASE_URL)
+
+        # Try different common app names or get from environment
+        app_names_to_try = ["gm_test", "discord_agent", "agent"]
+
+        for app_name in app_names_to_try:
+            try:
+                sessions_resp = session_service.list_sessions(
+                    app_name=app_name,
+                    user_id=_current_user_adk_id
+                )
+                session_list = getattr(sessions_resp, "sessions", [])
+
+                if session_list:
+                    # Get the most recent session
+                    latest_session = max(session_list, key=lambda s: getattr(s, 'created_at', 0))
+                    recovered_session_id = str(latest_session.id)
+                    logger.info(f"📝 Recovered session_id: {recovered_session_id} for user: {_current_user_adk_id} (app: {app_name})")
+                    return recovered_session_id
+            except Exception as e:
+                logger.debug(f"📝 No sessions found for app_name: {app_name}, trying next...")
+                continue
+
+        logger.warning(f"📝 No sessions found for user: {_current_user_adk_id} in any app")
+        return None
+
+    except Exception as e:
+        logger.error(f"📝 Failed to recover session_id: {str(e)}", exc_info=True)
+        return None
 
 
 async def notes_function(
@@ -51,8 +103,16 @@ async def notes_function(
     )
 
     global _current_session_id
+
+    # If no session_id, try to recover it
     if not _current_session_id:
-        return "❌ Error: No active session. Please try again."
+        logger.info("📝 No current session_id, attempting to recover...")
+        _current_session_id = _recover_session_id()
+
+        if _current_session_id:
+            logger.info(f"📝 Successfully recovered session_id: {_current_session_id}")
+        else:
+            return "❌ Error: No active session found. Please start a new conversation to create a session."
 
     try:
         # Map function parameters to note_tool.call kwargs

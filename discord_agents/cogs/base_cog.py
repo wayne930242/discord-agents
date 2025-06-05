@@ -235,12 +235,14 @@ class AgentCog(commands.Cog):
             logger.debug(f"Attempting to set session_id {session_id} for note tool...")
             from discord_agents.domain.tool_def.note_wrapper_tool import (
                 set_note_session_id,
+                set_note_user_adk_id,
             )
 
             if session_id:  # Ensure session_id is not None
                 set_note_session_id(session_id)
+                set_note_user_adk_id(user_adk_id)  # Also set user_adk_id for recovery
                 logger.info(
-                    f"✅ Successfully set session_id {session_id} for note_wrapper_tool"
+                    f"✅ Successfully set session_id {session_id} and user_adk_id {user_adk_id} for note_wrapper_tool"
                 )
             else:
                 logger.warning(
