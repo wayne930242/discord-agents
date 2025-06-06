@@ -27,7 +27,7 @@ def create_summarizer_agent() -> Agent:
 
     summarizer_agent = Agent(
         name="summarizer",
-        model="gemini-2.5-flash-preview-04-17",
+        model="gemini-2.0-flash-lite",
         description="A specialized agent that summarizes content at various detail levels.",
         instruction=(
             "You are a professional content summarizer. "

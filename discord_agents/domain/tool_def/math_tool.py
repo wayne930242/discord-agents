@@ -3,7 +3,7 @@ from google.adk.tools.agent_tool import AgentTool
 import math
 import numexpr  # type: ignore
 
-AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
+AGENT_MODEL = "gemini-2.0-flash-lite"
 
 
 def calculator(expression: str) -> str:

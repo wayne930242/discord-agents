@@ -4,7 +4,7 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import FunctionTool
 
 
-AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
+AGENT_MODEL = "gemini-2.0-flash-lite"
 
 
 def dice_tool(dice_count: int, dice_sides: int) -> int:

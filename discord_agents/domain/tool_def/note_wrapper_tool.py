@@ -137,7 +137,7 @@ async def notes_function(
 
 # Create the wrapper tool instance
 logger.info("📝 Creating note_wrapper_tool as FunctionTool...")
-note_wrapper_tool = FunctionTool(notes_function)
+note_wrapper_tool: FunctionTool = FunctionTool(notes_function)
 logger.info(
     f"✅ note_wrapper_tool created: {type(note_wrapper_tool).__name__} (name='{note_wrapper_tool.name}')"
 )

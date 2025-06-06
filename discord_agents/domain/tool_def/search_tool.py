@@ -5,7 +5,7 @@ from langchain_community.tools import TavilySearchResults
 
 from discord_agents.env import TAVILY_API_KEY
 
-AGENT_MODEL = "gemini-2.5-flash-preview-04-17"
+AGENT_MODEL = "gemini-2.0-flash-lite"
 
 
 def create_search_agent() -> Agent:

@@ -135,7 +135,7 @@ class MyBot:
         logger.info(f"Bot is ready. Logged in as {self._bot.user}")
         if self._cog:
             try:
-                self._bot.add_cog(self._cog)
+                await self._bot.add_cog(self._cog)
                 logger.info(f"Cog added successfully: {self._cog}")
 
                 agent = self._cog.my_agent

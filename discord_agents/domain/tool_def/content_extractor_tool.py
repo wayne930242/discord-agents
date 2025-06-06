@@ -79,7 +79,7 @@ def create_content_extractor_agent() -> Agent:
     extract_content_tool = FunctionTool(func=_extract_content_from_url)
     extractor_agent = Agent(
         name="content_extractor",
-        model="gemini-2.5-flash-preview-04-17",
+        model="gemini-2.0-flash-lite",
         description="A specialized agent that extracts and analyzes content from web pages using Crawl4AI.",
         instruction=(
             "You are a web content analysis specialist.\n\n"

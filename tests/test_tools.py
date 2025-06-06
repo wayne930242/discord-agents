@@ -11,13 +11,16 @@ adk_module = types.ModuleType("google.adk")
 tools_module = types.ModuleType("google.adk.tools")
 base_tool_module = types.ModuleType("google.adk.tools.base_tool")
 
+
 class BaseTool:  # minimal BaseTool stub
     name = "stub"
 
-base_tool_module.BaseTool = BaseTool
-tools_module.base_tool = base_tool_module
-adk_module.tools = tools_module
-dum_module.adk = adk_module
+
+# Use setattr to avoid mypy attribute errors
+setattr(base_tool_module, "BaseTool", BaseTool)
+setattr(tools_module, "base_tool", base_tool_module)
+setattr(adk_module, "tools", tools_module)
+setattr(dum_module, "adk", adk_module)
 sys.modules.setdefault("google", dum_module)
 sys.modules.setdefault("google.adk", adk_module)
 sys.modules.setdefault("google.adk.tools", tools_module)
@@ -44,12 +47,11 @@ from discord_agents.domain.tools import Tools, TOOLS_DICT
 from discord_agents.domain.tool_def.note_wrapper_tool import note_wrapper_tool
 
 
-def test_get_existing_tool_returns_correct_instance():
+def test_get_existing_tool_returns_correct_instance() -> None:
     tool = Tools.get_tool("notes")
     assert tool is note_wrapper_tool
 
 
-def test_get_unknown_tool_raises_key_error():
+def test_get_unknown_tool_raises_key_error() -> None:
     with pytest.raises(KeyError):
         Tools.get_tool("unknown")
-
