@@ -31,6 +31,7 @@ dependencies = [
     "crawl4ai>=0.6.3",
     "playwright>=1.52.0",
     "numexpr>=2.10.2",
+    "pytest>=8.4.0",
 ]
 
 [build-system]
