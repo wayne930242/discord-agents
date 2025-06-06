@@ -53,12 +53,29 @@ class AgentCog(commands.Cog):
     async def _ensure_session(self, user_adk_id: str) -> Result[str, str]:
         if user_adk_id in self.user_sessions:
             return Ok(self.user_sessions[user_adk_id])
+
+        try:
+            sessions_resp = self.session_service.list_sessions(
+                app_name=self.APP_NAME, user_id=user_adk_id
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            return Err(f"Failed to list sessions: {exc}")
+
+        session_list = getattr(sessions_resp, "sessions", [])
+        if session_list:
+            latest_session = max(session_list, key=lambda s: s.last_update_time)
+            session_id = str(latest_session.id)
+            self.user_sessions[user_adk_id] = session_id
+            logger.info(f"Loaded existing session {session_id} for user {user_adk_id}")
+            return Ok(session_id)
+
         new_session = self.session_service.create_session(
             user_id=user_adk_id,
             app_name=self.APP_NAME,
         )
         if new_session is None or not hasattr(new_session, "id"):
             return Err("The session object returned by create_session is invalid.")
+
         session_id = str(new_session.id)
         self.user_sessions[user_adk_id] = session_id
         logger.info(f"Created new session {session_id} for user {user_adk_id}")
@@ -197,7 +214,7 @@ class AgentCog(commands.Cog):
         if isinstance(message.channel, discord.DMChannel):
             user_info_parts.append("Channel Type: Direct Message")
         elif isinstance(message.channel, discord.TextChannel):
-            user_info_parts.append(f"Channel Type: Text Channel")
+            user_info_parts.append("Channel Type: Text Channel")
             user_info_parts.append(f"Channel Name: #{message.channel.name}")
 
             # Guild/Server info
