@@ -2,18 +2,146 @@ from redis import Redis
 from discord_agents.env import REDIS_URL
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
-from typing import Optional, Literal, Any
+from typing import Optional, Literal, Any, TypeVar, Generic, Type, Union
 import json
 from redlock import Redlock  # type: ignore
 import time
 
 logger = get_logger("broker")
 
+# Type variable for generic type safety
+T = TypeVar("T")
+
+
+class SessionDataManager(Generic[T]):
+    """Type-safe Redis-based session data manager for storing session-specific data"""
+
+    def __init__(
+        self,
+        redis_client: Redis,
+        key_prefix: str,
+        data_type: Type[T],
+        default_value: Optional[T] = None,
+    ):
+        self.redis_client = redis_client
+        self.key_prefix = key_prefix
+        self.data_type = data_type
+        self.default_value = default_value
+
+    def _get_key(self, session_id: str) -> str:
+        """Generate Redis key for session data"""
+        return f"{self.key_prefix}:{session_id}"
+
+    def set(
+        self, session_id: str, value: T, expire_seconds: Optional[int] = None
+    ) -> None:
+        """Set data for a specific session with type checking and optional expiration"""
+        if not isinstance(value, self.data_type):
+            raise TypeError(
+                f"Expected {self.data_type.__name__}, got {type(value).__name__}"
+            )
+
+        try:
+            key = self._get_key(session_id)
+            serialized_value = json.dumps(value)
+            if expire_seconds:
+                self.redis_client.setex(key, expire_seconds, serialized_value)
+            else:
+                self.redis_client.set(key, serialized_value)
+            logger.debug(f"📝 Set session data for {session_id}: {value}")
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to set session data for {session_id}: {e}"
+            )
+
+    def get(self, session_id: str) -> Optional[T]:
+        """Get data for a specific session"""
+        try:
+            key = self._get_key(session_id)
+            serialized_value = self.redis_client.get(key)
+            if serialized_value is None:
+                logger.debug(
+                    f"📝 No session data for {session_id}, returning default: {self.default_value}"
+                )
+                return self.default_value
+
+            value = json.loads(serialized_value)
+            # Type checking: ensure the deserialized value matches expected type
+            if not isinstance(value, self.data_type):
+                logger.warning(
+                    f"📝 Session data type mismatch for {session_id}, returning default"
+                )
+                return self.default_value
+
+            logger.debug(f"📝 Get session data for {session_id}: {value}")
+            return value
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to get session data for {session_id}: {e}"
+            )
+            return self.default_value
+
+    def has(self, session_id: str) -> bool:
+        """Check if session has data"""
+        try:
+            key = self._get_key(session_id)
+            return self.redis_client.exists(key) > 0
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to check session data existence for {session_id}: {e}"
+            )
+            return False
+
+    def clear(self, session_id: str) -> bool:
+        """Clear data for a specific session. Returns True if data existed."""
+        try:
+            key = self._get_key(session_id)
+            deleted = self.redis_client.delete(key)
+            if deleted > 0:
+                logger.debug(f"📝 Cleared session data for {session_id}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to clear session data for {session_id}: {e}"
+            )
+            return False
+
+    def clear_all(self) -> int:
+        """Clear all session data with this prefix. Returns number of keys deleted."""
+        try:
+            pattern = f"{self.key_prefix}:*"
+            keys = self.redis_client.keys(pattern)
+            if keys:
+                deleted = self.redis_client.delete(*keys)
+                logger.debug(
+                    f"📝 Cleared {deleted} session data entries with prefix {self.key_prefix}"
+                )
+                return deleted
+            return 0
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to clear all session data with prefix {self.key_prefix}: {e}"
+            )
+            return 0
+
+    def set_expiration(self, session_id: str, expire_seconds: int) -> bool:
+        """Set expiration time for existing session data"""
+        try:
+            key = self._get_key(session_id)
+            return self.redis_client.expire(key, expire_seconds)
+        except Exception as e:
+            logger.error(
+                f"[Redis Error] Failed to set expiration for {session_id}: {e}"
+            )
+            return False
+
 
 class BotRedisClient:
     _instance: Optional["BotRedisClient"] = None
     _redlock: Redlock = None
     _client: Redis
+    _session_data_manager: SessionDataManager[dict[str, Any]]
 
     BOT_STATE_KEY = "bot:{bot_id}:state"
     LOCK_STARTING_KEY = "lock:bot:{bot_id}:starting"
@@ -31,11 +159,19 @@ class BotRedisClient:
     BOT_SETUP_CONFIG_KEY = "bot:{bot_id}:setup_config"
     HISTORY_KEY = "history:{model}"
 
+    # Session data keys
+    SESSION_DATA_KEY = "session:{session_id}:data"
+
     def __new__(cls) -> "BotRedisClient":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._client = Redis.from_url(REDIS_URL, decode_responses=True)
             cls._instance._redlock = Redlock([REDIS_URL])
+
+            # Initialize session data manager
+            cls._instance._session_data_manager = SessionDataManager[dict[str, Any]](
+                cls._instance._client, "session_data", dict, {}
+            )
         return cls._instance
 
     def get_state(self, bot_id: str) -> str:
@@ -273,3 +409,19 @@ class BotRedisClient:
                 self._client.delete(key)
         except Exception as e:
             logger.error(f"[Redis Error] prune_message_history: {e}")
+
+    # Session data management methods
+    def get_session_data(self, session_id: str, key: str, default: Any = None) -> Any:
+        """Get data for a session by key"""
+        session_data = self._session_data_manager.get(session_id) or {}
+        return session_data.get(key, default)
+
+    def set_session_data(self, session_id: str, key: str, value: Any) -> None:
+        """Set data for a session by key"""
+        session_data = self._session_data_manager.get(session_id) or {}
+        session_data[key] = value
+        self._session_data_manager.set(session_id, session_data)
+
+    def clear_session_data(self, session_id: str) -> bool:
+        """Clear all data for a session"""
+        return self._session_data_manager.clear(session_id)

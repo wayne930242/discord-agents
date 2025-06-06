@@ -5,7 +5,7 @@ from result import Result, Ok, Err
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
-from typing import Optional, Union
+from typing import Optional
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.agent import MyAgent
@@ -231,22 +231,6 @@ class AgentCog(commands.Cog):
             logger.error("Failed to get session_id")
             await message.channel.send(self.ERROR_MESSAGE)
             return
-
-        # Set session_id for note tool if it exists
-        try:
-            logger.debug(f"Attempting to set session_id {session_id} for note tool...")
-            from discord_agents.domain.tool_def.note_wrapper_tool import (
-                set_note_session_id,
-            )
-
-            set_note_session_id(session_id)
-            logger.info(
-                f"✅ Successfully set session_id {session_id} for note_wrapper_tool"
-            )
-        except Exception as e:
-            logger.error(
-                f"❌ Could not set session_id for note tool: {str(e)}", exc_info=True
-            )
 
         # Format user info and prepend to query
         user_info = self._format_user_info(message)
