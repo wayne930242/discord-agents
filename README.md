@@ -8,7 +8,7 @@ A Discord bot powered by Google's Generative AI, built with Python and Flask.
 - Google ADK for agents
 - A web GUI for administration
 - PostgreSQL database for storing bot configurations
-- Custom bot management system with thread-based scheduling with Redis
+- Custom bot management system with thread-based scheduling using Redis
 
 ## Prerequisites
 

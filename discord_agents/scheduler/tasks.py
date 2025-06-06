@@ -35,7 +35,7 @@ def should_start_bot_in_model_task(bot_id: str) -> None:
 def should_start_bot_task(
     bot_id: str, init_data: MyBotInitConfig, setup_data: MyAgentSetupConfig
 ) -> None:
-    """Set bot to should_start state and clear config"""
+    """Set bot to should_start state and store config"""
     logger.info(f"Dispatch start bot task for {bot_id}")
     redis_broker.set_should_start(bot_id, init_data, setup_data)
 
