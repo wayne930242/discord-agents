@@ -42,6 +42,16 @@ build-backend = "hatchling.build"
 line-length = 100
 target-version = "py39"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources.*",
+    "ignore::DeprecationWarning:flask_admin.*",
+    "ignore::DeprecationWarning:discord.*",
+    "ignore:pkg_resources is deprecated:DeprecationWarning",
+    "ignore:Deprecated call to.*declare_namespace:DeprecationWarning",
+    "ignore:parameter 'timeout' of type 'float' is deprecated:DeprecationWarning",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.16.0",

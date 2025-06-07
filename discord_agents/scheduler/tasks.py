@@ -23,7 +23,7 @@ def bot_idle_task(bot_id: str) -> None:
 def should_start_bot_in_model_task(bot_id: str) -> None:
     with get_flask_app().app_context():
         db_id = int(bot_id.replace("bot_", ""))
-        bot: Optional[BotModel] = BotModel.query.get(db_id)
+        bot: Optional[BotModel] = BotModel.query.filter_by(id=db_id).first()
         if not bot:
             logger.error(f"Bot {bot_id} not found in DB")
             return
