@@ -9,7 +9,6 @@ from discord_agents.core.config import settings
 from discord_agents.utils.logger import get_logger, setup_custom_logging
 from discord_agents.scheduler.worker import bot_manager
 import os
-import logging
 
 logger = get_logger("fastapi_main")
 
@@ -19,7 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan events"""
     # Startup
     try:
-        # 重新設置日誌格式，因為 uvicorn 可能會覆蓋它
+        # Reset logging format, because uvicorn may overwrite it
         setup_custom_logging()
 
         logger.info("Starting Discord Agents FastAPI application...")
