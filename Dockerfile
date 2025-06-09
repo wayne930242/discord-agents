@@ -12,8 +12,9 @@ RUN npm install -g pnpm && \
 
 # Copy frontend source and build
 COPY frontend/ ./
-ENV VITE_API_BASE_URL=http://localhost:8080/api/v1
-RUN pnpm build
+ARG VITE_API_BASE_URL=http://localhost:8080/api/v1
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+RUN echo "Building with VITE_API_BASE_URL: $VITE_API_BASE_URL" && pnpm build
 
 # Backend stage
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
