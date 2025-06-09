@@ -25,6 +25,7 @@ def start_backend():
             "--port",
             "8080",
             "--reload",
+            "--no-access-log",
         ]
     )
 

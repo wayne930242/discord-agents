@@ -69,6 +69,7 @@ def start_backend():
                 port,
                 "--workers",
                 "1",
+                "--no-access-log",
             ]
         )
 

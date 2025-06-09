@@ -6,9 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from discord_agents.api import auth, bots, health, admin
 from discord_agents.core.database import engine, Base
 from discord_agents.core.config import settings
-from discord_agents.utils.logger import get_logger
+from discord_agents.utils.logger import get_logger, setup_custom_logging
 from discord_agents.scheduler.worker import bot_manager
 import os
+import logging
 
 logger = get_logger("fastapi_main")
 
@@ -18,6 +19,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan events"""
     # Startup
     try:
+        # 重新設置日誌格式，因為 uvicorn 可能會覆蓋它
+        setup_custom_logging()
+
         logger.info("Starting Discord Agents FastAPI application...")
 
         # Initialize database with automatic migrations
@@ -109,4 +113,6 @@ if __name__ == "__main__":
         port=int(os.getenv("PORT", "8080")),
         reload=True,
         log_level="info",
+        # Disable uvicorn's access log to avoid overwriting our custom logging format
+        access_log=False,
     )

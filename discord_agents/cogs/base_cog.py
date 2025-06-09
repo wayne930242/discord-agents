@@ -51,8 +51,34 @@ class AgentCog(commands.Cog):
             return Err(f"Unknown channel type for user {message.author.id}")
 
     async def _ensure_session(self, user_adk_id: str) -> Result[str, str]:
+        # Check if we have a cached session
         if user_adk_id in self.user_sessions:
-            return Ok(self.user_sessions[user_adk_id])
+            cached_session_id = self.user_sessions[user_adk_id]
+
+            # Verify the cached session still exists in database
+            try:
+                existing_session = self.session_service.get_session(
+                    app_name=self.APP_NAME,
+                    user_id=user_adk_id,
+                    session_id=cached_session_id,
+                )
+                if existing_session is not None:
+                    logger.debug(
+                        f"Using cached session {cached_session_id} for user {user_adk_id}"
+                    )
+                    return Ok(cached_session_id)
+                else:
+                    # Cached session no longer exists, remove from cache
+                    logger.warning(
+                        f"Cached session {cached_session_id} no longer exists, removing from cache"
+                    )
+                    del self.user_sessions[user_adk_id]
+            except Exception as e:
+                logger.warning(
+                    f"Failed to verify cached session {cached_session_id}: {e}"
+                )
+                # Remove invalid cached session
+                del self.user_sessions[user_adk_id]
 
         try:
             sessions_resp = self.session_service.list_sessions(
@@ -63,23 +89,31 @@ class AgentCog(commands.Cog):
 
         session_list = getattr(sessions_resp, "sessions", [])
         if session_list:
+            # Use the latest session
             latest_session = max(session_list, key=lambda s: s.last_update_time)
             session_id = str(latest_session.id)
             self.user_sessions[user_adk_id] = session_id
             logger.info(f"Loaded existing session {session_id} for user {user_adk_id}")
             return Ok(session_id)
 
-        new_session = self.session_service.create_session(
-            user_id=user_adk_id,
-            app_name=self.APP_NAME,
-        )
-        if new_session is None or not hasattr(new_session, "id"):
-            return Err("The session object returned by create_session is invalid.")
+        # Create new session if none exists
+        try:
+            new_session = self.session_service.create_session(
+                user_id=user_adk_id,
+                app_name=self.APP_NAME,
+            )
+            if new_session is None or not hasattr(new_session, "id"):
+                return Err("The session object returned by create_session is invalid.")
 
-        session_id = str(new_session.id)
-        self.user_sessions[user_adk_id] = session_id
-        logger.info(f"Created new session {session_id} for user {user_adk_id}")
-        return Ok(session_id)
+            session_id = str(new_session.id)
+            self.user_sessions[user_adk_id] = session_id
+            logger.info(f"Created new session {session_id} for user {user_adk_id}")
+            return Ok(session_id)
+        except Exception as e:
+            logger.error(
+                f"Failed to create new session for {user_adk_id}: {e}", exc_info=True
+            )
+            return Err(f"Failed to create new session: {e}")
 
     async def process_agent_stream_responses(
         self,
@@ -302,18 +336,82 @@ class AgentCog(commands.Cog):
                 )
             else:
                 user_adk_id = f"discord_unknown_{ctx.author.id}"
-        sessions_resp = self.session_service.list_sessions(
-            app_name=self.APP_NAME, user_id=user_adk_id
-        )
+
+        try:
+            sessions_resp = self.session_service.list_sessions(
+                app_name=self.APP_NAME, user_id=user_adk_id
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to list sessions for {user_adk_id}: {e}", exc_info=True
+            )
+            await ctx.send("清除對話紀錄時發生錯誤，請稍後再試。")
+            return
+
         session_list = getattr(sessions_resp, "sessions", [])
         if not session_list:
             await ctx.send("未找到對話紀錄。")
             return
+
+        # Count successfully deleted sessions
+        deleted_count = 0
+        session_ids_to_clear = []
+
         for session in session_list:
-            self.session_service.delete_session(
-                app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
-            )
-        await ctx.send(f"已清除 {len(session_list)} 個對話紀錄。")
+            try:
+                # Delete from database
+                self.session_service.delete_session(
+                    app_name=self.APP_NAME, user_id=user_adk_id, session_id=session.id
+                )
+                session_ids_to_clear.append(str(session.id))
+                deleted_count += 1
+                logger.info(f"Deleted session {session.id} for user {user_adk_id}")
+            except Exception as e:
+                logger.error(
+                    f"Failed to delete session {session.id}: {e}", exc_info=True
+                )
+
+        # Clear from memory cache
+        if user_adk_id in self.user_sessions:
+            old_session_id = self.user_sessions[user_adk_id]
+            if old_session_id in session_ids_to_clear:
+                del self.user_sessions[user_adk_id]
+                logger.info(f"Cleared cached session for user {user_adk_id}")
+
+        # Clear Redis session data for each deleted session
+        try:
+            from discord_agents.scheduler.broker import BotRedisClient
+
+            redis_client = BotRedisClient()
+
+            for session_id in session_ids_to_clear:
+                redis_client.clear_session_data(session_id)
+                logger.info(f"Cleared Redis session data for session {session_id}")
+        except Exception as e:
+            logger.warning(f"Failed to clear Redis session data: {e}")
+
+        # Clear notes associated with sessions (if using note tool)
+        try:
+            from discord_agents.domain.tool_def.note_tool import NoteTool
+
+            note_tool = NoteTool(name="note_cleaner", description="Clean notes")
+
+            total_notes_deleted = 0
+            for session_id in session_ids_to_clear:
+                notes_deleted = note_tool._delete_notes_by_session(session_id)
+                total_notes_deleted += notes_deleted
+
+            if total_notes_deleted > 0:
+                logger.info(
+                    f"Deleted {total_notes_deleted} notes associated with cleared sessions"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to clear associated notes: {e}")
+
+        if deleted_count > 0:
+            await ctx.send(f"已清除 {deleted_count} 個對話紀錄。")
+        else:
+            await ctx.send("未能清除任何對話紀錄，請檢查日誌以了解詳情。")
 
     @commands.command(name="info")
     async def info_command(self, ctx: commands.Context) -> None:

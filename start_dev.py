@@ -32,6 +32,7 @@ class DevServer:
                     "--port",
                     "8080",
                     "--reload",
+                    "--no-access-log",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
