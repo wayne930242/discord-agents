@@ -12,8 +12,9 @@ RUN npm install -g pnpm && \
 
 # Copy frontend source and build
 COPY frontend/ ./
-ARG VITE_API_BASE_URL=http://localhost:8080/api/v1
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+# Try to read from environment first, then fallback to ARG
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
 RUN echo "Building with VITE_API_BASE_URL: $VITE_API_BASE_URL" && pnpm build
 
 # Backend stage

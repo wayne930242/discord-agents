@@ -1,8 +1,29 @@
 import axios from "axios";
 
 // API base URL - configurable via environment variables
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
+// First try window.location origin (for production), then env var, then localhost
+const getApiBaseUrl = () => {
+  // If we're in production (not localhost), use current origin
+  if (
+    typeof window !== "undefined" &&
+    !window.location.hostname.includes("localhost") &&
+    !window.location.hostname.includes("127.0.0.1")
+  ) {
+    return `${window.location.protocol}//${window.location.host}/api/v1`;
+  }
+  // Otherwise use env var or localhost fallback
+  return import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Debug logging
+console.log("API_BASE_URL:", API_BASE_URL);
+console.log(
+  "window.location:",
+  typeof window !== "undefined" ? window.location.href : "N/A"
+);
+console.log("VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
 
 // Create axios instance with default config
 const api = axios.create({
