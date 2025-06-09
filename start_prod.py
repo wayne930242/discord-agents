@@ -52,8 +52,8 @@ def start_backend():
     """Start backend"""
     print("🚀 Start FastAPI backend server...")
 
-    # Get port from environment variable, default to 8000
-    port = os.getenv("PORT", "8000")
+    # Get port from environment variable, default to 8080
+    port = os.getenv("PORT", "8080")
 
     try:
         # Use uvicorn to start, without reload mode
@@ -88,25 +88,37 @@ def main():
         print("❌ Please run this script in the project root directory")
         sys.exit(1)
 
-    # Check if pnpm is installed
-    try:
-        subprocess.run(["pnpm", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ Please install pnpm: npm install -g pnpm")
-        sys.exit(1)
+    # Skip frontend build if in Docker environment
+    skip_frontend_build = os.getenv("SKIP_FRONTEND_BUILD", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
-    print("🎯 Discord Agents production environment starting...")
-    print("=" * 50)
+    if not skip_frontend_build:
+        # Check if pnpm is installed
+        try:
+            subprocess.run(["pnpm", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("❌ Please install pnpm: npm install -g pnpm")
+            sys.exit(1)
 
-    # Build frontend
-    if not build_frontend():
-        print("❌ Build frontend failed, exiting")
-        sys.exit(1)
+        print("🎯 Discord Agents production environment starting...")
+        print("=" * 50)
+
+        # Build frontend
+        if not build_frontend():
+            print("❌ Build frontend failed, exiting")
+            sys.exit(1)
+    else:
+        print("🎯 Discord Agents production environment starting (Docker mode)...")
+        print("=" * 50)
+        print("ℹ️ Skipping frontend build (using pre-built assets)")
 
     print("=" * 50)
     print("🎉 Prepare to start production environment!")
-    print(f"📍 Application address: http://localhost:{os.getenv('PORT', '8000')}")
-    print(f"📍 API docs: http://localhost:{os.getenv('PORT', '8000')}/api/docs")
+    print(f"📍 Application address: http://localhost:{os.getenv('PORT', '8080')}")
+    print(f"📍 API docs: http://localhost:{os.getenv('PORT', '8080')}/api/docs")
     print("📍 Press Ctrl+C to stop server")
     print("=" * 50)
 

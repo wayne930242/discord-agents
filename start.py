@@ -23,7 +23,7 @@ def start_backend():
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            "8080",
             "--reload",
         ]
     )
@@ -61,7 +61,7 @@ def main():
         frontend_process.start()
 
         print("🎉 Server started!")
-        print("📍 Backend: http://localhost:8000")
+        print("📍 Backend: http://localhost:8080")
         print("📍 Frontend: http://localhost:5173")
         print("📍 Press Ctrl+C to stop")
 

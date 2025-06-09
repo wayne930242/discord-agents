@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Make specific env variables available to the client
       "import.meta.env.VITE_API_BASE_URL": JSON.stringify(
-        env.VITE_API_BASE_URL || "http://localhost:8000/api"
+        env.VITE_API_BASE_URL || "http://localhost:8080/api"
       ),
     },
   };

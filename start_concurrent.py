@@ -32,7 +32,7 @@ class ConcurrentDevServer:
                     "--host",
                     "0.0.0.0",
                     "--port",
-                    "8000",
+                    "8080",
                     "--reload",
                 ],
                 stdout=subprocess.PIPE,
@@ -150,8 +150,8 @@ class ConcurrentDevServer:
                 futures = {future_backend: "Backend", future_frontend: "Frontend"}
 
                 print("🎉 Development environment started!")
-                print("📍 Backend API: http://localhost:8000")
-                print("📍 API docs: http://localhost:8000/api/docs")
+                print("📍 Backend API: http://localhost:8080")
+                print("📍 API docs: http://localhost:8080/api/docs")
                 print("📍 Frontend app: http://localhost:5173")
                 print("📍 Press Ctrl+C to stop all servers")
                 print("=" * 50)
