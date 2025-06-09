@@ -1,5 +1,5 @@
 from redis import Redis
-from discord_agents.env import REDIS_URL
+from discord_agents.core.config import settings
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig
 from typing import Optional, Literal, Any, TypeVar, Generic, Type, Union
@@ -165,8 +165,10 @@ class BotRedisClient:
     def __new__(cls) -> "BotRedisClient":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._client = Redis.from_url(REDIS_URL, decode_responses=True)
-            cls._instance._redlock = Redlock([REDIS_URL])
+            cls._instance._client = Redis.from_url(
+                settings.redis_url, decode_responses=True
+            )
+            cls._instance._redlock = Redlock([settings.redis_url])
 
             # Initialize session data manager
             cls._instance._session_data_manager = SessionDataManager[dict[str, Any]](

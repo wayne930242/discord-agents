@@ -1,6 +1,8 @@
-from typing import Any, Optional
-from discord_agents.scheduler.broker import BotRedisClient
+from typing import Any, Optional, TYPE_CHECKING
 from discord_agents.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("note_broker_service")
 
@@ -9,6 +11,9 @@ class NoteBrokerService:
     """Note session data management service using Redis"""
 
     def __init__(self) -> None:
+        # Lazy import to avoid circular dependency
+        from discord_agents.scheduler.broker import BotRedisClient
+
         self._redis_client = BotRedisClient()
 
     def get_session_data(self, session_id: str, key: str, default: Any = None) -> Any:

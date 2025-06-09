@@ -138,11 +138,13 @@ class MockAsyncWebCrawler:
 setattr(crawl4ai_module, "AsyncWebCrawler", MockAsyncWebCrawler)
 sys.modules.setdefault("crawl4ai", crawl4ai_module)
 
-from discord_agents.app import create_app
-from discord_agents.models.bot import db, BotModel, AgentModel
+from fastapi.testclient import TestClient
+from discord_agents.models.bot import BotModel, AgentModel
+from discord_agents.core.database import SessionLocal
 from discord_agents.scheduler.broker import BotRedisClient
 from discord_agents.scheduler.tasks import should_start_bot_in_model_task
-from discord_agents.env import ADMIN_USERNAME, ADMIN_PASSWORD
+from discord_agents.core.config import settings
+from discord_agents.fastapi_main import app
 
 
 class TestE2ESystem:
@@ -150,28 +152,27 @@ class TestE2ESystem:
 
     def setup_method(self) -> None:
         """Setup before each test"""
-        self.app = create_app()
-        self.app.config["TESTING"] = True
-        self.client = self.app.test_client()
+        self.client = TestClient(app)
         self.redis_client = BotRedisClient()
 
         # Setup basic authentication
         auth_string = base64.b64encode(
-            f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}".encode()
+            f"{settings.admin_username}:{settings.admin_password}".encode()
         ).decode()
         self.auth_headers = {"Authorization": f"Basic {auth_string}"}
 
-    def test_flask_health_check(self) -> None:
-        """Test Flask application health check"""
-        response = self.client.get("/health")
+    def test_fastapi_health_check(self) -> None:
+        """Test FastAPI application health check"""
+        response = self.client.get("/api/v1/health")
         assert response.status_code == 200
-        assert response.data.decode() == "OK"
-        print("✅ Flask health check passed")
+        assert response.json()["status"] == "healthy"
+        print("✅ FastAPI health check passed")
 
     def test_database_connection(self) -> None:
         """Test database connection and data integrity"""
-        with self.app.app_context():
-            bots = BotModel.query.all()
+        db = SessionLocal()
+        try:
+            bots = db.query(BotModel).all()
             assert len(bots) > 0, "Database should contain at least one bot"
 
             bot = bots[0]
@@ -179,6 +180,8 @@ class TestE2ESystem:
             assert bot.agent is not None, "Bot should have an associated agent"
             assert bot.agent.name is not None, "Agent should have a name"
             print(f"✅ Database connection OK, found {len(bots)} bot(s)")
+        finally:
+            db.close()
 
     def test_redis_broker_connection(self) -> None:
         """Test Redis broker connection and basic operations"""
@@ -265,8 +268,9 @@ class TestE2ESystem:
 
     def test_broker_bot_configuration_management(self) -> None:
         """Test broker bot configuration management"""
-        with self.app.app_context():
-            bot = BotModel.query.first()
+        db = SessionLocal()
+        try:
+            bot = db.query(BotModel).first()
             assert bot is not None
 
             bot_id = f"bot_{bot.id}"
@@ -295,6 +299,8 @@ class TestE2ESystem:
             assert cleared_setup is None
 
             print(f"✅ Broker bot configuration management OK (bot_id: {bot_id})")
+        finally:
+            db.close()
 
     def test_broker_distributed_locking(self) -> None:
         """Test broker distributed locking mechanism"""
@@ -403,34 +409,35 @@ class TestE2ESystem:
 
         print("✅ Broker message history OK")
 
-    def test_admin_interface_access(self) -> None:
-        """Test admin interface access"""
+    def test_api_authentication(self) -> None:
+        """Test API authentication"""
         # Test unauthenticated access
-        response = self.client.get("/")
+        response = self.client.get("/api/v1/bots")
         assert response.status_code == 401
 
         # Test authenticated access
-        response = self.client.get("/", headers=self.auth_headers)
-        assert response.status_code == 302  # Redirect to admin
-        print("✅ Admin interface authentication OK")
+        response = self.client.get(
+            "/api/v1/bots", auth=(settings.admin_username, settings.admin_password)
+        )
+        assert response.status_code == 200
+        print("✅ API authentication OK")
 
-    def test_bot_management_interface(self) -> None:
-        """Test bot management interface"""
-        response = self.client.get("/admin/botmanageview/", headers=self.auth_headers)
+    def test_bot_management_api(self) -> None:
+        """Test bot management API"""
+        response = self.client.get(
+            "/api/v1/bots", auth=(settings.admin_username, settings.admin_password)
+        )
         assert response.status_code == 200
 
-        content = response.data.decode()
-        assert "Bot Manage" in content
-        print("✅ Bot management interface OK")
+        data = response.json()
+        assert isinstance(data, list)
+        print("✅ Bot management API OK")
 
-    def test_bot_configuration_interface(self) -> None:
-        """Test bot configuration interface"""
-        response = self.client.get("/admin/botmodel/", headers=self.auth_headers)
+    def test_react_frontend_served(self) -> None:
+        """Test React frontend is served"""
+        response = self.client.get("/")
         assert response.status_code == 200
-
-        content = response.data.decode()
-        assert "Bot Model" in content or "BotModel" in content
-        print("✅ Bot configuration interface OK")
+        print("✅ React frontend served OK")
 
     def test_tools_integration(self) -> None:
         """Test tool integration"""
@@ -459,8 +466,9 @@ class TestE2ESystem:
 
     def test_agent_configuration(self) -> None:
         """Test Agent configuration"""
-        with self.app.app_context():
-            bot = BotModel.query.first()
+        db = SessionLocal()
+        try:
+            bot = db.query(BotModel).first()
             assert bot is not None
             assert bot.agent is not None
 
@@ -476,6 +484,8 @@ class TestE2ESystem:
             print(
                 f"✅ Agent configuration OK (name: {bot.agent.name}, model: {bot.agent.agent_model})"
             )
+        finally:
+            db.close()
 
     @patch("discord_agents.domain.bot.MyBot")
     def test_bot_lifecycle_simulation(self, mock_bot_class: Any) -> None:
@@ -485,8 +495,9 @@ class TestE2ESystem:
         mock_bot_instance.setup_my_agent.return_value.is_ok.return_value = True
         mock_bot_class.return_value = mock_bot_instance
 
-        with self.app.app_context():
-            bot = BotModel.query.first()
+        db = SessionLocal()
+        try:
+            bot = db.query(BotModel).first()
             assert bot is not None
 
             bot_id = f"bot_{bot.id}"
@@ -500,6 +511,8 @@ class TestE2ESystem:
                 print(f"✅ Bot lifecycle simulation OK (state: {state})")
             except Exception as e:
                 print(f"⚠️ Bot start simulation warning: {e}")
+        finally:
+            db.close()
 
     def test_error_handling(self) -> None:
         """Test error handling"""
@@ -517,9 +530,10 @@ class TestE2ESystem:
 
     def test_system_integration(self) -> None:
         """Test system integration"""
-        with self.app.app_context():
+        db = SessionLocal()
+        try:
             # 1. Database
-            bots = BotModel.query.all()
+            bots = db.query(BotModel).all()
             assert len(bots) > 0
 
             # 2. Redis Broker
@@ -542,6 +556,8 @@ class TestE2ESystem:
             print(f"   - Tool system: {len(TOOLS_DICT)} tools")
             print(f"   - Agent system: {len(models)} models")
             print(f"   - Broker: Redis connection active")
+        finally:
+            db.close()
 
     def teardown_method(self) -> None:
         """Cleanup after each test"""
@@ -564,7 +580,7 @@ def test_full_e2e_workflow() -> None:
 
     try:
         # Execute all tests in order
-        test_instance.test_flask_health_check()
+        test_instance.test_fastapi_health_check()
         test_instance.test_database_connection()
         test_instance.test_redis_broker_connection()
         test_instance.test_broker_bot_state_management()
@@ -573,9 +589,9 @@ def test_full_e2e_workflow() -> None:
         test_instance.test_broker_distributed_locking()
         test_instance.test_broker_bot_discovery()
         test_instance.test_broker_message_history()
-        test_instance.test_admin_interface_access()
-        test_instance.test_bot_management_interface()
-        test_instance.test_bot_configuration_interface()
+        test_instance.test_api_authentication()
+        test_instance.test_bot_management_api()
+        test_instance.test_react_frontend_served()
         test_instance.test_tools_integration()
         test_instance.test_agent_configuration()
         test_instance.test_bot_lifecycle_simulation()
@@ -584,7 +600,7 @@ def test_full_e2e_workflow() -> None:
 
         print("\n🎉 All E2E tests passed! Your Discord bot system is working properly!")
         print("📊 Test Coverage:")
-        print("   ✅ Flask application")
+        print("   ✅ FastAPI application")
         print("   ✅ Database connectivity")
         print("   ✅ Redis broker (comprehensive)")
         print("   ✅ Bot state management")
@@ -593,7 +609,9 @@ def test_full_e2e_workflow() -> None:
         print("   ✅ Distributed locking")
         print("   ✅ Bot discovery")
         print("   ✅ Message history")
-        print("   ✅ Admin interfaces")
+        print("   ✅ API authentication")
+        print("   ✅ Bot management API")
+        print("   ✅ React frontend")
         print("   ✅ Tool integration")
         print("   ✅ Agent configuration")
         print("   ✅ Bot lifecycle")

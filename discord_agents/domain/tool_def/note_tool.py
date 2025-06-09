@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, Any, List, Optional, Tuple
 from google.adk.tools.base_tool import BaseTool
-from discord_agents.env import DATABASE_URL
+from discord_agents.core.config import settings
 from discord_agents.utils.logger import get_logger
 
 logger = get_logger("note_tool")
@@ -22,12 +22,12 @@ class NoteTool(BaseTool):
     def _get_db_config(self) -> Dict[str, str]:
         """Extract database configuration from DATABASE_URL"""
         # Parse DATABASE_URL (format: postgresql://user:password@host:port/database)
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL environment variable is not set")
+        if not settings.database_url:
+            raise ValueError("DATABASE_URL is not configured")
 
         import urllib.parse
 
-        parsed = urllib.parse.urlparse(DATABASE_URL)
+        parsed = urllib.parse.urlparse(settings.database_url)
 
         return {
             "DB_HOST": parsed.hostname or "localhost",
@@ -76,14 +76,16 @@ class NoteTool(BaseTool):
             logger.error(f"Failed to initialize MCP Toolbox: {str(e)}", exc_info=True)
             raise
 
-    def _execute_sql(self, query: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, Any]]:
+    def _execute_sql(
+        self, query: str, params: Tuple[Any, ...] = ()
+    ) -> List[Dict[str, Any]]:
         """Execute SQL query directly using psycopg2"""
         import psycopg2
         import psycopg2.extras
 
         conn = None
         try:
-            conn = psycopg2.connect(DATABASE_URL)
+            conn = psycopg2.connect(settings.database_url)
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(query, params)
                 # Always commit the transaction
@@ -221,7 +223,10 @@ class NoteTool(BaseTool):
             logger.info(f"Deleted {deleted_count} notes for session {session_id}")
             return deleted_count
         except Exception as e:
-            logger.error(f"Failed to delete notes for session {session_id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to delete notes for session {session_id}: {str(e)}",
+                exc_info=True,
+            )
             return 0
 
     async def call(self, session_id: str, action: str, **kwargs: Any) -> str:

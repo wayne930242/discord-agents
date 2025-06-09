@@ -9,11 +9,7 @@ from discord_agents.domain.agent import MyAgent
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.domain.tools import Tools
 
-from discord_agents.env import (
-    DATABASE_URL,
-    DM_ID_WHITE_LIST,
-    SERVER_ID_WHITE_LIST,
-)
+from discord_agents.core.config import settings
 from discord_agents.utils.logger import get_logger
 
 logger = get_logger("bot")
@@ -64,8 +60,12 @@ class MyBot:
         wl: list[str] = []
         if dm_whitelist:
             wl.extend(str(id_val) for id_val in dm_whitelist if id_val is not None)
-        if DM_ID_WHITE_LIST:
-            wl.extend(str(id_val) for id_val in DM_ID_WHITE_LIST if id_val is not None)
+        if settings.dm_id_white_list_parsed:
+            wl.extend(
+                str(id_val)
+                for id_val in settings.dm_id_white_list_parsed
+                if id_val is not None
+            )
         wl = list(set(wl))
         logger.info(f"DM Whitelist initialized with {len(wl)} entries: {wl}")
         return wl
@@ -74,9 +74,11 @@ class MyBot:
         wl: list[str] = []
         if srv_whitelist:
             wl.extend(str(id_val) for id_val in srv_whitelist if id_val is not None)
-        if SERVER_ID_WHITE_LIST:
+        if settings.server_id_white_list_parsed:
             wl.extend(
-                str(id_val) for id_val in SERVER_ID_WHITE_LIST if id_val is not None
+                str(id_val)
+                for id_val in settings.server_id_white_list_parsed
+                if id_val is not None
             )
         wl = list(set(wl))
         logger.info(f"Server Whitelist initialized with {len(wl)} entries: {wl}")
@@ -118,7 +120,7 @@ class MyBot:
                 bot=self._bot,
                 bot_id=self.bot_id,
                 app_name=config["app_name"],
-                db_url=DATABASE_URL,
+                db_url=settings.database_url,
                 use_function_map=config["use_function_map"],
                 error_message=config["error_message"],
                 my_agent=my_agent,

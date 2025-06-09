@@ -4,7 +4,7 @@ from discord_agents.utils.logger import get_logger
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig, MyBot
 from discord_agents.scheduler.broker import BotRedisClient
 from discord_agents.models.bot import BotModel
-from discord_agents.scheduler.helpers import get_flask_app
+from discord_agents.core.database import SessionLocal
 
 logger = get_logger("tasks")
 redis_broker = BotRedisClient()
@@ -21,15 +21,18 @@ def bot_idle_task(bot_id: str) -> None:
 
 
 def should_start_bot_in_model_task(bot_id: str) -> None:
-    with get_flask_app().app_context():
+    db = SessionLocal()
+    try:
         db_id = int(bot_id.replace("bot_", ""))
-        bot: Optional[BotModel] = BotModel.query.filter_by(id=db_id).first()
+        bot: Optional[BotModel] = db.query(BotModel).filter_by(id=db_id).first()
         if not bot:
             logger.error(f"Bot {bot_id} not found in DB")
             return
         should_start_bot_task(
             bot.bot_id(), bot.to_init_config(), bot.to_setup_agent_config()
         )
+    finally:
+        db.close()
 
 
 def should_start_bot_task(
@@ -64,13 +67,16 @@ def should_stop_all_bots_task() -> None:
 
 def should_start_all_bots_in_model_task() -> None:
     logger.info("Dispatch start all bots task")
-    with get_flask_app().app_context():
-        all_db_bots = BotModel.query.all()
+    db = SessionLocal()
+    try:
+        all_db_bots = db.query(BotModel).all()
         for bot in all_db_bots:
             init_data = bot.to_init_config()
             setup_data = bot.to_setup_agent_config()
             if init_data and setup_data:
                 should_start_bot_task(bot.bot_id(), init_data, setup_data)
+    finally:
+        db.close()
 
 
 def listen_bots_task(bot_id: str) -> None:

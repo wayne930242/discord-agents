@@ -1,6 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, DateTime, Index
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, DeclarativeBase
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -9,10 +8,12 @@ if TYPE_CHECKING:
 else:
     from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
 
-db = SQLAlchemy()
+
+class Base(DeclarativeBase):
+    pass
 
 
-class AgentModel(db.Model):  # type: ignore
+class AgentModel(Base):
     __tablename__ = "my_agents"
 
     id = Column(Integer, primary_key=True)
@@ -26,7 +27,7 @@ class AgentModel(db.Model):  # type: ignore
     bot = relationship("BotModel", back_populates="agent", uselist=False)
 
 
-class BotModel(db.Model):  # type: ignore
+class BotModel(Base):
     __tablename__ = "my_bots"
 
     id = Column(Integer, primary_key=True)
@@ -47,7 +48,9 @@ class BotModel(db.Model):  # type: ignore
         return MyBotInitConfig(
             bot_id=self.bot_id(),
             token=str(self.token),
-            command_prefix_param=str(self.command_prefix) if self.command_prefix else None,
+            command_prefix_param=(
+                str(self.command_prefix) if self.command_prefix else None
+            ),
             dm_whitelist=list(self.dm_whitelist) if self.dm_whitelist else None,
             srv_whitelist=list(self.srv_whitelist) if self.srv_whitelist else None,
         )
@@ -61,7 +64,9 @@ class BotModel(db.Model):  # type: ignore
             tool_instructions=str(self.agent.tool_instructions),
             agent_model=str(self.agent.agent_model),
             app_name=str(self.agent.name),
-            use_function_map=dict(self.use_function_map) if self.use_function_map else {},
+            use_function_map=(
+                dict(self.use_function_map) if self.use_function_map else {}
+            ),
             error_message=str(self.error_message),
             tools=list(self.agent.tools) if self.agent.tools else [],
         )
@@ -73,7 +78,7 @@ class BotModel(db.Model):  # type: ignore
         return my_bot
 
 
-class NoteModel(db.Model):  # type: ignore
+class NoteModel(Base):
     __tablename__ = "notes"
 
     id = Column(Integer, primary_key=True)
@@ -82,10 +87,12 @@ class NoteModel(db.Model):  # type: ignore
     content = Column(Text, nullable=False)
     tags = Column(JSON, default=list)  # Store tags list
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Create index for session_id to improve query performance
     __table_args__ = (
-        Index('ix_notes_session_id', 'session_id'),
-        Index('ix_notes_created_at', 'created_at'),
+        Index("ix_notes_session_id", "session_id"),
+        Index("ix_notes_created_at", "created_at"),
     )

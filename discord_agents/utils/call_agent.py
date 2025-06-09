@@ -7,7 +7,6 @@ import tiktoken
 import time
 
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.broker import BotRedisClient
 
 logger = get_logger("call_agent")
 
@@ -86,7 +85,7 @@ def trim_history(
 
 
 def _get_history_and_prompt(
-    broker_client: BotRedisClient, model: str, query: str, max_tokens: Union[int, float]
+    broker_client, model: str, query: str, max_tokens: Union[int, float]
 ) -> Result[tuple[str, bool, int], str]:
     try:
         history_items = broker_client.get_message_history(model)
@@ -204,6 +203,9 @@ async def stream_agent_responses(
         )
         yield Err(MessageCenter.INVALID_INPUT)
         return
+    # Lazy import to avoid circular dependency
+    from discord_agents.scheduler.broker import BotRedisClient
+
     broker_client = BotRedisClient()
     prompt_result = _get_history_and_prompt(broker_client, model, query, max_tokens)
     if prompt_result.is_err():

@@ -1,0 +1,43 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Dashboard } from "./pages/Dashboard";
+import { BotManagement } from "./pages/BotManagement";
+import { Login } from "./pages/Login";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// Create a client
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <div className="min-h-screen bg-background">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bots"
+              element={
+                <ProtectedRoute>
+                  <BotManagement />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </Router>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  );
+}
+
+export default App;

@@ -3,15 +3,15 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.langchain_tool import LangchainTool
 from langchain_community.tools import TavilySearchResults
 
-from discord_agents.env import TAVILY_API_KEY
+from discord_agents.core.config import settings
 
 AGENT_MODEL = "gemini-2.0-flash-lite"
 
 
 def create_search_agent() -> Agent:
-    tavily_api_key = TAVILY_API_KEY
+    tavily_api_key = settings.tavily_api_key
     if not tavily_api_key:
-        raise ValueError("TAVILY_API_KEY not found in environment variables")
+        raise ValueError("TAVILY_API_KEY not found in configuration")
 
     tavily_tool_instance = TavilySearchResults(
         max_results=5,

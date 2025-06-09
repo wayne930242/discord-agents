@@ -2,38 +2,46 @@ from typing import Any, Optional
 from google.adk.tools import FunctionTool, ToolContext
 from discord_agents.domain.tool_def.note_tool import note_tool
 from discord_agents.utils.logger import get_logger
-from discord_agents.scheduler.note_broker_service import get_note_broker_service
 
 logger = get_logger("note_wrapper_tool")
 
-# Note broker service for persistent session data storage
-_note_broker = get_note_broker_service()
+# Note broker service for persistent session data storage (lazy loaded)
+_note_broker = None
+
+
+def _get_note_broker():
+    """Get note broker service with lazy initialization"""
+    global _note_broker
+    if _note_broker is None:
+        from discord_agents.scheduler.note_broker_service import get_note_broker_service
+        _note_broker = get_note_broker_service()
+    return _note_broker
 
 
 # Session data management functions using Note Broker Service
 def get_session_note_ids(session_id: str) -> list[str]:
     """Get note IDs for a session"""
-    return _note_broker.get_session_note_ids(session_id)
+    return _get_note_broker().get_session_note_ids(session_id)
 
 
 def add_session_note_id(note_id: str, session_id: str) -> None:
     """Add a note ID to a session"""
-    _note_broker.add_session_note_id(session_id, note_id)
+    _get_note_broker().add_session_note_id(session_id, note_id)
 
 
 def remove_session_note_id(note_id: str, session_id: str) -> bool:
     """Remove a note ID from a session. Returns True if removed."""
-    return _note_broker.remove_session_note_id(session_id, note_id)
+    return _get_note_broker().remove_session_note_id(session_id, note_id)
 
 
 def set_session_data(key: str, value: Any, session_id: str) -> None:
     """Set data for a session by key"""
-    _note_broker.set_session_data(session_id, key, value)
+    _get_note_broker().set_session_data(session_id, key, value)
 
 
 def get_session_data(key: str, default: Any, session_id: str) -> Any:
     """Get data for a session by key"""
-    return _note_broker.get_session_data(session_id, key, default)
+    return _get_note_broker().get_session_data(session_id, key, default)
 
 
 async def notes_function(

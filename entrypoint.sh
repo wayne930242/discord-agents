@@ -3,8 +3,5 @@
 # Playwright install
 playwright install
 
-# Db migrate
-flask db upgrade
-
-# Run app
-exec python -m discord_agents.main
+# Run FastAPI app (migrations run automatically on startup)
+exec uvicorn discord_agents.fastapi_main:app --host 0.0.0.0 --port ${PORT:-8000}
