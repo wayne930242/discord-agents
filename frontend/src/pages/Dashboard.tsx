@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Bot, Settings, Activity, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { botAPI, authAPI } from "@/lib/api";
+import { botAPI, authAPI, type Bot as BotType } from "@/lib/api";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -20,15 +20,30 @@ export function Dashboard() {
     queryFn: botAPI.getBots,
   });
 
+  // Fetch bot status
+  const { data: botStatus = {} } = useQuery({
+    queryKey: ["bot-status"],
+    queryFn: botAPI.getBotStatus,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
   const handleLogout = () => {
     authAPI.logout();
     navigate("/login");
   };
 
-  // Calculate statistics
-  const activeBots = bots.filter(
-    (bot) => !bot.error_message || bot.error_message.length === 0
-  ).length;
+  const getBotStatus = (bot: BotType): string => {
+    const botId = `bot_${bot.id}`;
+    return botStatus[botId] || "idle";
+  };
+
+  const isRunning = (bot: BotType): boolean => {
+    const status = getBotStatus(bot);
+    return status === "running" || status === "starting";
+  };
+
+  // Calculate statistics using real bot status
+  const activeBots = bots.filter(isRunning).length;
   const totalBots = bots.length;
   const offlineBots = totalBots - activeBots;
 
@@ -153,12 +168,12 @@ export function Dashboard() {
                       )}
                       <span
                         className={`text-xs px-2 py-1 rounded ${
-                          bot.error_message
-                            ? "bg-red-100 text-red-800"
-                            : "bg-green-100 text-green-800"
+                          isRunning(bot)
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
                         }`}
                       >
-                        {bot.error_message ? "離線" : "線上"}
+                        {isRunning(bot) ? "線上" : "離線"}
                       </span>
                     </div>
                   </div>

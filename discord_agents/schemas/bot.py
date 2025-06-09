@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -40,7 +40,7 @@ class BotBase(BaseModel):
     srv_whitelist: List[str] = []
     use_function_map: Dict[str, Any] = {}
 
-    @field_validator('dm_whitelist', 'srv_whitelist', mode='before')
+    @field_validator("dm_whitelist", "srv_whitelist", mode="before")
     @classmethod
     def convert_ids_to_strings(cls, v):
         """Convert integer IDs to strings for Discord IDs"""
@@ -62,7 +62,7 @@ class BotUpdate(BaseModel):
     use_function_map: Optional[Dict[str, Any]] = None
     agent_id: Optional[int] = None
 
-    @field_validator('dm_whitelist', 'srv_whitelist', mode='before')
+    @field_validator("dm_whitelist", "srv_whitelist", mode="before")
     @classmethod
     def convert_ids_to_strings(cls, v):
         """Convert integer IDs to strings for Discord IDs"""
