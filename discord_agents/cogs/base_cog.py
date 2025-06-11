@@ -10,6 +10,7 @@ from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.agent import MyAgent
 
+
 logger = get_logger("base_cog")
 
 
@@ -41,6 +42,41 @@ class AgentCog(commands.Cog):
         logger.info(f"Session Service initialized for app: {app_name}")
         self.my_agent = my_agent
         logger.info(f"Agent initialized for app: {app_name}")
+
+        # Get agent ID from database for token usage tracking
+        self.agent_id: Optional[int] = None
+        self.agent_name: Optional[str] = None
+        self._load_agent_info()
+
+    def _load_agent_info(self) -> None:
+        """Load agent ID and name from database for token usage tracking"""
+        try:
+            # Use lazy import to avoid circular dependency
+            from discord_agents.core.database import SessionLocal
+            from discord_agents.models.bot import BotModel
+
+            db = SessionLocal()
+            try:
+                # Extract numeric ID from bot_id (format: "bot_123")
+                numeric_bot_id = int(self.bot_id.replace("bot_", ""))
+                bot_model = (
+                    db.query(BotModel).filter(BotModel.id == numeric_bot_id).first()
+                )
+
+                if bot_model and bot_model.agent:
+                    self.agent_id = bot_model.agent.id
+                    self.agent_name = bot_model.agent.name
+                    logger.info(
+                        f"Loaded agent info: ID={self.agent_id}, Name={self.agent_name}"
+                    )
+                else:
+                    logger.warning(
+                        f"Could not find agent info for bot_id: {self.bot_id}"
+                    )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to load agent info: {e}", exc_info=True)
 
     def _get_user_adk_id(self, message: discord.Message) -> Result[str, str]:
         if isinstance(message.channel, discord.DMChannel):
@@ -134,6 +170,13 @@ class AgentCog(commands.Cog):
                 if chunk.strip():
                     await message.channel.send(chunk)
 
+        # Track tokens for usage recording
+        from discord_agents.utils.call_agent import count_tokens
+
+        input_tokens = count_tokens(query)
+        output_tokens = 0
+        full_response = ""
+
         try:
             async for part_result in stream_agent_responses(
                 query=query,
@@ -152,6 +195,7 @@ class AgentCog(commands.Cog):
                 try:
                     content = part_result.ok()
                     if content:
+                        full_response += content
                         await send_chunks(content)
                 except discord.HTTPException as http_error:
                     logger.error(
@@ -166,6 +210,11 @@ class AgentCog(commands.Cog):
                         exc_info=True,
                     )
                     continue
+
+            # Calculate output tokens and record usage
+            output_tokens = count_tokens(full_response)
+            self._record_token_usage(input_tokens, output_tokens)
+
             return Ok(None)
         except Exception as stream_error:
             logger.error(
@@ -440,3 +489,32 @@ class AgentCog(commands.Cog):
             f"`{self.bot.command_prefix}info` - 顯示機器人資訊\n"
         )
         await ctx.send(help_text)
+
+    def _record_token_usage(self, input_tokens: int, output_tokens: int) -> None:
+        """Record token usage for this agent"""
+        if not self.agent_id or not self.agent_name:
+            logger.warning("Cannot record token usage: agent info not available")
+            return
+
+        try:
+            # Use lazy import to avoid circular dependency
+            from discord_agents.core.database import SessionLocal
+            from discord_agents.services.token_usage_service import TokenUsageService
+
+            db = SessionLocal()
+            try:
+                TokenUsageService.record_token_usage(
+                    db=db,
+                    agent_id=self.agent_id,
+                    agent_name=self.agent_name,
+                    model_name=self.my_agent.model_name,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
+                logger.info(
+                    f"Recorded token usage: {input_tokens} input + {output_tokens} output = {input_tokens + output_tokens} total tokens for agent {self.agent_name}"
+                )
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to record token usage: {e}", exc_info=True)

@@ -28,13 +28,13 @@ class Base(DeclarativeBase):
 class AgentModel(Base):
     __tablename__ = "my_agents"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)
-    description = Column(Text, nullable=False)
-    role_instructions = Column(Text, nullable=False)
-    tool_instructions = Column(Text, nullable=False)
-    agent_model = Column(String(100), nullable=False)
-    tools = Column(JSON, default=list)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    role_instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    tool_instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_model: Mapped[str] = mapped_column(String(100), nullable=False)
+    tools: Mapped[list] = mapped_column(JSON, default=list)
 
     bot = relationship("BotModel", back_populates="agent", uselist=False)
 
@@ -42,15 +42,15 @@ class AgentModel(Base):
 class BotModel(Base):
     __tablename__ = "my_bots"
 
-    id = Column(Integer, primary_key=True)
-    token = Column(String(100), nullable=False, unique=True)
-    error_message = Column(Text, nullable=False)
-    command_prefix = Column(String(10), default="!")
-    dm_whitelist = Column(JSON, default=list)
-    srv_whitelist = Column(JSON, default=list)
-    use_function_map = Column(JSON, default=dict)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False)
+    command_prefix: Mapped[str] = mapped_column(String(10), default="!")
+    dm_whitelist: Mapped[list] = mapped_column(JSON, default=list)
+    srv_whitelist: Mapped[list] = mapped_column(JSON, default=list)
+    use_function_map: Mapped[dict] = mapped_column(JSON, default=dict)
 
-    agent_id = Column(Integer, ForeignKey("my_agents.id"))
+    agent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("my_agents.id"))
     agent = relationship("AgentModel", back_populates="bot")
 
     def bot_id(self) -> str:
@@ -93,13 +93,15 @@ class BotModel(Base):
 class NoteModel(Base):
     __tablename__ = "notes"
 
-    id = Column(Integer, primary_key=True)
-    session_id = Column(String(255), nullable=False)
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=False)
-    tags = Column(JSON, default=list)  # Store tags list
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list)  # Store tags list
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 

@@ -151,13 +151,13 @@ def _handle_event(
                 and hasattr(event.actions, "escalate")
                 and event.actions.escalate
             ):
-                escalation_message = f"⚠️ 發生錯誤: {getattr(event, 'error_message', None) or '沒有特定訊息。'}"
+                escalation_message = f"⚠️ Error: {getattr(event, 'error_message', None) or 'No specific message.'}"
                 return False, escalation_message, "", True
             if event.content and event.content.parts:
                 final_text = (full_response_text + event.content.parts[0].text).strip()
                 return False, final_text, "", True
             else:
-                return False, "⚠️ 未收到有效回應內容。", "", True
+                return False, "⚠️ No response content.", "", True
 
         # Non-final event full content
         if (
@@ -177,11 +177,11 @@ def _handle_event(
 
 
 class MessageCenter:
-    INVALID_INPUT = "❌ 輸入參數有誤，請確認後再試。"
-    HISTORY_ERROR = lambda err: f"❌ 歷史訊息處理錯誤: {err}"
-    HISTORY_TRIMMED = "⚠️ 部分歷史訊息因 token 限制已被省略，回應可能不完整。"
-    CONTENT_ERROR = "❌ 建立訊息內容時發生錯誤，請稍後再試。"
-    EVENT_ERROR = lambda err: f"❌ 回應處理時發生錯誤: {err}"
+    INVALID_INPUT = "❌ Invalid input parameters, please check and try again."
+    HISTORY_ERROR = lambda err: f"❌ History message processing error: {err}"
+    HISTORY_TRIMMED = "⚠️ Some history messages have been omitted due to token limit, the response may be incomplete."
+    CONTENT_ERROR = "❌ Error creating message content, please try again later."
+    EVENT_ERROR = lambda err: f"❌ Error processing response: {err}"
 
 
 async def stream_agent_responses(
@@ -228,6 +228,10 @@ async def stream_agent_responses(
     user_content = try_content
     full_response_text = ""
     final_response_yielded = False
+
+    # Track actual response for token counting
+    actual_response_text = ""
+
     async for event in runner.run_async(
         user_id=user_id, session_id=session_id, new_message=user_content
     ):
@@ -235,10 +239,19 @@ async def stream_agent_responses(
             should_continue, yield_value, full_response_text, is_final = _handle_event(
                 event, only_final, full_response_text
             )
+
+            # Accumulate actual response content for token counting
+            if yield_value is not None and not yield_value.startswith("（......）"):
+                actual_response_text += yield_value
+
             if yield_value is not None:
                 yield Ok(yield_value)
+
             if is_final and not final_response_yielded:
                 try:
+                    # Calculate actual output tokens from response
+                    actual_output_tokens = count_tokens(actual_response_text)
+
                     broker_client.add_message_history(
                         model=model,
                         text=query,
@@ -246,6 +259,12 @@ async def stream_agent_responses(
                         interval_seconds=interval_seconds,
                         timestamp=time.time(),
                     )
+
+                    # Log token usage for debugging
+                    logger.info(
+                        f"Token usage - Input: {query_tokens}, Output: {actual_output_tokens}"
+                    )
+
                 except Exception as e:
                     logger.warning(f"Failed to add broker history: {e}")
                 final_response_yielded = True
