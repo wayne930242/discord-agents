@@ -79,12 +79,12 @@ export function AgentEditDialog({
       description: agent?.description || "",
       role_instructions: agent?.role_instructions || "",
       tool_instructions: agent?.tool_instructions || "",
-      agent_model: agent?.agent_model || availableModels[0] || "",
+      agent_model: agent?.agent_model || "",
       tools: agent?.tools || [],
     },
   });
 
-  // Reset form when agent changes
+  // Reset form when agent changes or when availableModels is loaded
   React.useEffect(() => {
     if (agent) {
       form.reset({
@@ -95,6 +95,9 @@ export function AgentEditDialog({
         agent_model: agent.agent_model,
         tools: agent.tools,
       });
+    } else if (availableModels.length > 0 && !form.getValues("agent_model")) {
+      // Set default model for new agents when models are loaded
+      form.setValue("agent_model", availableModels[0]);
     }
   }, [agent, form, availableModels]);
 
@@ -192,10 +195,7 @@ export function AgentEditDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AI 模型</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="選擇 AI 模型" />
