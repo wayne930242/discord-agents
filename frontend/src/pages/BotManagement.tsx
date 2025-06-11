@@ -240,7 +240,7 @@ export function BotManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="agent">代理程式</Label>
+                  <Label htmlFor="agent">代理人</Label>
                   <select
                     id="agent"
                     className="w-full p-2 border border-input rounded-md bg-background"
@@ -254,7 +254,7 @@ export function BotManagement() {
                       })
                     }
                   >
-                    <option value="">選擇代理程式 (可選)</option>
+                    <option value="">選擇代理人 (可選)</option>
                     {agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>
                         {agent.name}
@@ -298,7 +298,7 @@ export function BotManagement() {
                   <TableHead>ID</TableHead>
                   <TableHead>狀態</TableHead>
                   <TableHead>指令前綴</TableHead>
-                  <TableHead>代理程式</TableHead>
+                  <TableHead>代理人</TableHead>
                   <TableHead>Token</TableHead>
                   <TableHead>操作</TableHead>
                 </TableRow>

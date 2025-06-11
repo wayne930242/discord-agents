@@ -74,7 +74,7 @@ export function Dashboard() {
             Discord Agents Dashboard
           </h1>
           <p className="text-muted-foreground mt-2">
-            管理你的 Discord 機器人和代理程式
+            管理你的 Discord 機器人和代理人
           </p>
         </div>
         <Button variant="outline" onClick={handleLogout}>
@@ -158,9 +158,12 @@ export function Dashboard() {
             <CardTitle>快速操作</CardTitle>
             <CardDescription>常用的管理功能</CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-4">
+          <CardContent className="flex gap-4 flex-wrap">
             <Button asChild>
               <Link to="/bots">管理機器人</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/agents">管理 Agents</Link>
             </Button>
             <Button variant="outline" asChild>
               <Link to="/usage">

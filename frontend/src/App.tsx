@@ -3,9 +3,11 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { BotManagement } from "./pages/BotManagement";
+import { AgentManagement } from "./pages/AgentManagement";
 import { UsageAnalytics } from "./pages/UsageAnalytics";
 import { Login } from "./pages/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { Toaster } from "@/components/ui/toaster";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -42,6 +44,14 @@ function App() {
               }
             />
             <Route
+              path="/agents"
+              element={
+                <ProtectedRoute>
+                  <AgentManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/usage"
               element={
                 <ProtectedRoute>
@@ -52,6 +62,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      <Toaster />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );

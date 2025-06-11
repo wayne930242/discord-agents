@@ -171,16 +171,16 @@ export function BotEditDialog({
               name="agent_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>代理程式</FormLabel>
+                  <FormLabel>代理人</FormLabel>
                   <div className="flex gap-2">
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="選擇代理程式" />
+                          <SelectValue placeholder="選擇代理人" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">無代理程式</SelectItem>
+                        <SelectItem value="none">無代理人</SelectItem>
                         {agents.map((agent) => (
                           <SelectItem
                             key={agent.id}

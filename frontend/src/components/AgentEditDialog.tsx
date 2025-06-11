@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { agentAPI, type Agent } from "@/lib/api";
 import { X } from "lucide-react";
 
@@ -45,27 +45,10 @@ const agentFormSchema = z.object({
 type AgentFormValues = z.infer<typeof agentFormSchema>;
 
 interface AgentEditDialogProps {
-  agent: Agent | null;
+  agent?: Agent | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const availableModels = [
-  "gemini-2.5-flash-preview-04-17",
-  "gpt-4",
-  "gpt-3.5-turbo",
-  "claude-3-sonnet",
-];
-
-const availableTools = [
-  "search",
-  "life_env",
-  "rpg_dice",
-  "content_extractor",
-  "summarizer",
-  "math",
-  "notes",
-];
 
 export function AgentEditDialog({
   agent,
@@ -74,6 +57,21 @@ export function AgentEditDialog({
 }: AgentEditDialogProps) {
   const queryClient = useQueryClient();
 
+  // Fetch available tools and models
+  const { data: availableData } = useQuery({
+    queryKey: ["available-tools-models"],
+    queryFn: agentAPI.getAvailableToolsAndModels,
+  });
+
+  const availableModels = React.useMemo(
+    () => availableData?.models || [],
+    [availableData?.models]
+  );
+  const availableTools = React.useMemo(
+    () => availableData?.tools || [],
+    [availableData?.tools]
+  );
+
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(agentFormSchema),
     defaultValues: {
@@ -81,7 +79,7 @@ export function AgentEditDialog({
       description: agent?.description || "",
       role_instructions: agent?.role_instructions || "",
       tool_instructions: agent?.tool_instructions || "",
-      agent_model: agent?.agent_model || "gemini-2.5-flash-preview-04-17",
+      agent_model: agent?.agent_model || availableModels[0] || "",
       tools: agent?.tools || [],
     },
   });
@@ -98,7 +96,16 @@ export function AgentEditDialog({
         tools: agent.tools,
       });
     }
-  }, [agent, form]);
+  }, [agent, form, availableModels]);
+
+  const createAgentMutation = useMutation({
+    mutationFn: (data: Omit<Agent, "id">) => agentAPI.createAgent(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bots"] });
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      onOpenChange(false);
+    },
+  });
 
   const updateAgentMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Agent> }) =>
@@ -111,8 +118,11 @@ export function AgentEditDialog({
   });
 
   const onSubmit = async (data: AgentFormValues) => {
-    if (!agent) return;
-    await updateAgentMutation.mutateAsync({ id: agent.id, data });
+    if (agent) {
+      await updateAgentMutation.mutateAsync({ id: agent.id, data });
+    } else {
+      await createAgentMutation.mutateAsync(data);
+    }
   };
 
   const addTool = (tool: string) => {
@@ -130,14 +140,16 @@ export function AgentEditDialog({
     );
   };
 
-  if (!agent) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>編輯代理程式 - {agent.name}</DialogTitle>
-          <DialogDescription>修改代理程式的配置和指令</DialogDescription>
+          <DialogTitle>
+            {agent ? `編輯代理人 - ${agent.name}` : "創建代理人"}
+          </DialogTitle>
+          <DialogDescription>
+            {agent ? "修改代理人的配置和指令" : "創建新的 AI 代理人"}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -149,7 +161,7 @@ export function AgentEditDialog({
                 <FormItem>
                   <FormLabel>名稱</FormLabel>
                   <FormControl>
-                    <Input placeholder="代理程式名稱" {...field} />
+                    <Input placeholder="代理人名稱" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -164,7 +176,7 @@ export function AgentEditDialog({
                   <FormLabel>描述</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="代理程式的簡短描述"
+                      placeholder="代理人的簡短描述"
                       className="resize-none"
                       {...field}
                     />
@@ -190,7 +202,7 @@ export function AgentEditDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableModels.map((model) => (
+                      {availableModels.map((model: string) => (
                         <SelectItem key={model} value={model}>
                           {model}
                         </SelectItem>
@@ -210,7 +222,7 @@ export function AgentEditDialog({
                   <FormLabel>角色指令</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="描述代理程式的角色和行為..."
+                      placeholder="描述代理人的角色和行為..."
                       className="resize-none h-20"
                       {...field}
                     />
@@ -266,8 +278,11 @@ export function AgentEditDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {availableTools
-                          .filter((tool) => !form.watch("tools").includes(tool))
-                          .map((tool) => (
+                          .filter(
+                            (tool: string) =>
+                              !form.watch("tools").includes(tool)
+                          )
+                          .map((tool: string) => (
                             <SelectItem key={tool} value={tool}>
                               {tool}
                             </SelectItem>
@@ -284,8 +299,17 @@ export function AgentEditDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
-              <Button type="submit" disabled={updateAgentMutation.isPending}>
-                {updateAgentMutation.isPending ? "更新中..." : "更新代理程式"}
+              <Button
+                type="submit"
+                disabled={
+                  createAgentMutation.isPending || updateAgentMutation.isPending
+                }
+              >
+                {createAgentMutation.isPending || updateAgentMutation.isPending
+                  ? "處理中..."
+                  : agent
+                  ? "更新代理人"
+                  : "創建代理人"}
               </Button>
             </DialogFooter>
           </form>

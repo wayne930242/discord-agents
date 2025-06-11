@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from discord_agents.core.database import get_db
 from discord_agents.core.security import get_current_user
-from discord_agents.models.bot import BotModel, AgentModel
+from discord_agents.models.bot import AgentModel
 from discord_agents.schemas.bot import (
     Bot,
     BotCreate,
@@ -139,6 +139,17 @@ async def get_agents(
     """Get all agents"""
     agents = AgentService.get_agents(db)
     return [Agent.model_validate(agent) for agent in agents]
+
+
+@router.get("/tools/")
+async def get_available_tools(
+    current_user: str = Depends(get_current_user),
+) -> dict[str, list[str]]:
+    """Get available tools and models"""
+    from discord_agents.domain.tools import Tools
+    from discord_agents.domain.agent import LLMs
+
+    return {"tools": Tools.get_tool_names(), "models": LLMs.get_model_names()}
 
 
 @router.post("/agents/", response_model=Agent)

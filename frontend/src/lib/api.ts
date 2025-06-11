@@ -299,6 +299,14 @@ export const agentAPI = {
     const response = await api.put(`/bots/agents/${agentId}`, agent);
     return response.data;
   },
+
+  async getAvailableToolsAndModels(): Promise<{
+    tools: string[];
+    models: string[];
+  }> {
+    const response = await api.get("/bots/tools/");
+    return response.data;
+  },
 };
 
 // Token Usage API
