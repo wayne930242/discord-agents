@@ -1,0 +1,77 @@
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.mypy_cache
+.pytest_cache
+.coverage
+
+# Node.js
+node_modules
+frontend/node_modules
+frontend/.next
+frontend/dist
+npm-debug.log*
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis
+dump.rdb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation
+*.md
+docs/
+
+# Tests
+tests/
+test/
+
+# Development files
+*.dev
+dev.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv
+venv/
+ENV/
+
+# Playwright
+playwright-report/
+test-results/

@@ -17,7 +17,7 @@ ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
 RUN echo "Building with VITE_API_BASE_URL: $VITE_API_BASE_URL" && pnpm build
 
-# Backend stage with Playwright support
+# Backend stage with optimized Playwright support
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
@@ -26,11 +26,13 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    PLAYWRIGHT_BROWSERS_PATH=/app/browsers
 
-# Install system dependencies for Playwright
-RUN apt-get update && apt-get install -y \
+# Install minimal system dependencies for Playwright (reduced set)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
     libnss3 \
     libnspr4 \
     libatk-bridge2.0-0 \
@@ -39,7 +41,8 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 \
     libgbm1 \
     libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Copy and install Python dependencies first (for better caching)
 COPY pyproject.toml uv.lock ./
@@ -51,9 +54,18 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-# Install Playwright and browsers during build (not at runtime)
+# Install Playwright with optimizations for cloud deployment
 ENV PATH="/app/.venv/bin:$PATH"
-RUN playwright install chromium --with-deps
+# Set browser path to avoid permission issues
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/browsers
+# Only install chromium (not all browsers) to save space and memory
+RUN mkdir -p /app/browsers && \
+    playwright install chromium --with-deps && \
+    # Clean up unnecessary files to reduce image size
+    rm -rf /root/.cache/ms-playwright && \
+    rm -rf /tmp/* && \
+    # Set proper permissions
+    chmod -R 755 /app/browsers
 
 # Copy built frontend from frontend-builder stage
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
@@ -64,5 +76,9 @@ EXPOSE ${PORT}
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/v1/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
