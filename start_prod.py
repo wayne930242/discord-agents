@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 
-def build_frontend():
+def build_frontend() -> bool:
     """Build frontend"""
     print("🎨 Build React frontend...")
     frontend_dir = Path(__file__).parent / "frontend"
@@ -48,7 +48,7 @@ def build_frontend():
         return False
 
 
-def start_backend():
+def start_backend() -> bool:
     """Start backend"""
     print("🚀 Start FastAPI backend server...")
 
@@ -82,7 +82,7 @@ def start_backend():
     return True
 
 
-def main():
+def main() -> None:
     """Main function"""
     # Check if in the correct directory
     if not Path("discord_agents").exists():

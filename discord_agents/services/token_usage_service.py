@@ -340,6 +340,13 @@ class TokenUsageService:
 
         result = query.first()
 
+        if result is None:
+            return {
+                "total_input_cost": 0.0,
+                "total_output_cost": 0.0,
+                "total_cost": 0.0,
+            }
+
         return {
             "total_input_cost": float(result.total_input_cost or 0),
             "total_output_cost": float(result.total_output_cost or 0),

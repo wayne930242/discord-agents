@@ -24,7 +24,7 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
-def setup_custom_logging():
+def setup_custom_logging() -> None:
     """Setup custom logging, override FastAPI/uvicorn's configuration"""
     global _logging_configured
 

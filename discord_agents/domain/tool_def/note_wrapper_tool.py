@@ -6,10 +6,10 @@ from discord_agents.utils.logger import get_logger
 logger = get_logger("note_wrapper_tool")
 
 # Note broker service for persistent session data storage (lazy loaded)
-_note_broker = None
+_note_broker: Any | None = None
 
 
-def _get_note_broker():
+def _get_note_broker() -> Any:
     """Get note broker service with lazy initialization"""
     global _note_broker
     if _note_broker is None:
@@ -21,7 +21,8 @@ def _get_note_broker():
 # Session data management functions using Note Broker Service
 def get_session_note_ids(session_id: str) -> list[str]:
     """Get note IDs for a session"""
-    return _get_note_broker().get_session_note_ids(session_id)
+    result = _get_note_broker().get_session_note_ids(session_id)
+    return result if isinstance(result, list) else []
 
 
 def add_session_note_id(note_id: str, session_id: str) -> None:
@@ -31,7 +32,8 @@ def add_session_note_id(note_id: str, session_id: str) -> None:
 
 def remove_session_note_id(note_id: str, session_id: str) -> bool:
     """Remove a note ID from a session. Returns True if removed."""
-    return _get_note_broker().remove_session_note_id(session_id, note_id)
+    result = _get_note_broker().remove_session_note_id(session_id, note_id)
+    return bool(result)
 
 
 def set_session_data(key: str, value: Any, session_id: str) -> None:

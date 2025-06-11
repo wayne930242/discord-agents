@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
     # Agent model
-    agent_model: str = os.getenv("AGENT_MODEL", "gemini-2.5-flash-preview-04-17")
+    agent_model: str = os.getenv("AGENT_MODEL", "gemini-2.5-flash-preview-05-20")
 
     class Config:
         env_file = ".env"

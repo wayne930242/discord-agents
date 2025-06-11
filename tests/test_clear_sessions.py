@@ -1,11 +1,8 @@
-"""
-Test clear_sessions functionality to ensure proper cleanup
-"""
-
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 import discord
 from discord.ext import commands
+from typing import Any
 
 from discord_agents.cogs.base_cog import AgentCog
 from discord_agents.domain.agent import MyAgent
@@ -18,22 +15,22 @@ class MockSession:
 
 
 class MockSessionResponse:
-    def __init__(self, sessions):
+    def __init__(self, sessions: list[MockSession]) -> None:
         self.sessions = sessions
 
 
 class MockDatabaseSessionService:
     def __init__(self, db_url: str = ""):
         self.db_url = db_url
-        self.sessions = {}
-        self.deleted_sessions = set()
+        self.sessions: dict[str, list[MockSession]] = {}
+        self.deleted_sessions: set[str] = set()
 
-    def list_sessions(self, app_name: str, user_id: str):
+    def list_sessions(self, app_name: str, user_id: str) -> MockSessionResponse:
         sessions_key = f"{app_name}:{user_id}"
         sessions = self.sessions.get(sessions_key, [])
         return MockSessionResponse(sessions)
 
-    def create_session(self, app_name: str, user_id: str, **kwargs):
+    def create_session(self, app_name: str, user_id: str, **kwargs: Any) -> MockSession:
         session_id = f"session_{len(self.sessions)}"
         session = MockSession(session_id)
         sessions_key = f"{app_name}:{user_id}"
@@ -42,7 +39,7 @@ class MockDatabaseSessionService:
         self.sessions[sessions_key].append(session)
         return session
 
-    def delete_session(self, app_name: str, user_id: str, session_id: str):
+    def delete_session(self, app_name: str, user_id: str, session_id: str) -> None:
         sessions_key = f"{app_name}:{user_id}"
         if sessions_key in self.sessions:
             self.sessions[sessions_key] = [
@@ -50,7 +47,9 @@ class MockDatabaseSessionService:
             ]
         self.deleted_sessions.add(session_id)
 
-    def get_session(self, app_name: str, user_id: str, session_id: str):
+    def get_session(
+        self, app_name: str, user_id: str, session_id: str
+    ) -> MockSession | None:
         sessions_key = f"{app_name}:{user_id}"
         sessions = self.sessions.get(sessions_key, [])
         for session in sessions:
@@ -60,7 +59,7 @@ class MockDatabaseSessionService:
 
 
 @pytest.fixture
-def mock_agent():
+def mock_agent() -> MagicMock:
     agent = MagicMock(spec=MyAgent)
     agent.name = "test_agent"
     agent.model_name = "test_model"
@@ -71,7 +70,7 @@ def mock_agent():
 
 
 @pytest.fixture
-def mock_bot():
+def mock_bot() -> MagicMock:
     bot = MagicMock(spec=commands.Bot)
     bot.user = MagicMock()
     bot.user.id = 123456789
@@ -80,7 +79,7 @@ def mock_bot():
 
 
 @pytest.fixture
-def agent_cog(mock_bot, mock_agent):
+def agent_cog(mock_bot: MagicMock, mock_agent: MagicMock) -> AgentCog:
     with patch(
         "discord_agents.cogs.base_cog.DatabaseSessionService",
         MockDatabaseSessionService,
@@ -101,7 +100,9 @@ def agent_cog(mock_bot, mock_agent):
 class TestClearSessions:
 
     @pytest.mark.asyncio
-    async def test_clear_sessions_removes_cached_session(self, agent_cog):
+    async def test_clear_sessions_removes_cached_session(
+        self, agent_cog: AgentCog
+    ) -> None:
         """Test that clear_sessions removes cached session from memory"""
         user_adk_id = "discord_user_dm_123"
 
@@ -138,7 +139,7 @@ class TestClearSessions:
                 mock_note_tool_class.return_value = mock_note_tool
 
                 # Execute clear_sessions command callback directly
-                await agent_cog.clear_sessions.callback(agent_cog, ctx)
+                await agent_cog.clear_sessions(ctx)
 
         # Verify session is removed from cache
         assert user_adk_id not in agent_cog.user_sessions
@@ -146,10 +147,12 @@ class TestClearSessions:
         # Verify success message was sent
         ctx.send.assert_called_once()
         call_args = ctx.send.call_args[0][0]
-        assert "已清除" in call_args and "個對話紀錄" in call_args
+        assert "All sessions cleared" in call_args and "deleted" in call_args
 
     @pytest.mark.asyncio
-    async def test_ensure_session_handles_deleted_session(self, agent_cog):
+    async def test_ensure_session_handles_deleted_session(
+        self, agent_cog: AgentCog
+    ) -> None:
         """Test that _ensure_session handles deleted sessions properly"""
         user_adk_id = "discord_user_dm_123"
 
@@ -173,7 +176,9 @@ class TestClearSessions:
         assert agent_cog.user_sessions[user_adk_id] == new_session_id
 
     @pytest.mark.asyncio
-    async def test_clear_sessions_with_error_handling(self, agent_cog):
+    async def test_clear_sessions_with_error_handling(
+        self, agent_cog: AgentCog
+    ) -> None:
         """Test clear_sessions error handling"""
         user_adk_id = "discord_user_dm_123"
 
@@ -190,13 +195,13 @@ class TestClearSessions:
         )
 
         # Execute clear_sessions command callback directly
-        await agent_cog.clear_sessions.callback(agent_cog, ctx)
+        await agent_cog.clear_sessions(ctx)
 
         # Verify error message was sent
-        ctx.send.assert_called_once_with("清除對話紀錄時發生錯誤，請稍後再試。")
+        ctx.send.assert_called_once_with("Error occurred")
 
     @pytest.mark.asyncio
-    async def test_clear_sessions_no_sessions_found(self, agent_cog):
+    async def test_clear_sessions_no_sessions_found(self, agent_cog: AgentCog) -> None:
         """Test clear_sessions when no sessions exist"""
         ctx = MagicMock(spec=commands.Context)
         ctx.author = MagicMock()
@@ -205,7 +210,7 @@ class TestClearSessions:
         ctx.send = AsyncMock()
 
         # Execute clear_sessions command callback directly (no sessions exist)
-        await agent_cog.clear_sessions.callback(agent_cog, ctx)
+        await agent_cog.clear_sessions(ctx)
 
         # Verify "no sessions found" message was sent
-        ctx.send.assert_called_once_with("未找到對話紀錄。")
+        ctx.send.assert_called_once_with("No sessions found")

@@ -11,7 +11,7 @@ from multiprocessing import Process
 import time
 
 
-def start_backend():
+def start_backend() -> None:
     """Start backend"""
     print("🚀 Start backend...")
     subprocess.run(
@@ -30,7 +30,7 @@ def start_backend():
     )
 
 
-def start_frontend():
+def start_frontend() -> None:
     """Start frontend"""
     print("🎨 Start frontend...")
     frontend_dir = Path(__file__).parent / "frontend"
@@ -41,7 +41,7 @@ def start_frontend():
     subprocess.run(["pnpm", "dev"], cwd=frontend_dir)
 
 
-def main():
+def main() -> None:
     """Main function"""
     print("🎯 Discord Agents starting...")
 
@@ -66,7 +66,6 @@ def main():
         print("📍 Frontend: http://localhost:5173")
         print("📍 Press Ctrl+C to stop")
 
-        # 等待進程
         backend_process.join()
         frontend_process.join()
 

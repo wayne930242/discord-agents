@@ -8,10 +8,11 @@ import subprocess
 import sys
 import argparse
 from pathlib import Path
+from typing import Optional
 
 
 class DockerManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.container_name = "discord-agents"
         self.image_name = "discord-agents:latest"
         self.port = 8080
@@ -45,7 +46,7 @@ class DockerManager:
         print("✅ Docker is ready")
         return True
 
-    def build_image(self, tag: str = None) -> bool:
+    def build_image(self, tag: Optional[str] = None) -> bool:
         """Build Docker image"""
         if not tag:
             tag = self.image_name
@@ -110,7 +111,9 @@ class DockerManager:
 
         return True
 
-    def start_container(self, detached: bool = True, host_port: int = None) -> bool:
+    def start_container(
+        self, detached: bool = True, host_port: Optional[int] = None
+    ) -> bool:
         """Start Docker container"""
         if host_port:
             self.host_port = host_port
@@ -209,7 +212,7 @@ class DockerManager:
         else:
             print(f"ℹ️  Container not found: {self.container_name}")
 
-    def restart(self, build: bool = False, host_port: int = None) -> bool:
+    def restart(self, build: bool = False, host_port: Optional[int] = None) -> bool:
         """Restart container (stop, remove, optionally build, start)"""
         print("🔄 Restarting container...")
 
@@ -238,7 +241,7 @@ class DockerManager:
         print("✅ Cleanup completed")
 
 
-def main():
+def main() -> None:
     """Main function"""
     parser = argparse.ArgumentParser(
         description="Discord Agents Docker Management Script",

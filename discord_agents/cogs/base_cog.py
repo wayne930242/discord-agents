@@ -394,7 +394,7 @@ class AgentCog(commands.Cog):
         try:
             from discord_agents.domain.tool_def.note_tool import NoteTool
 
-            note_tool = NoteTool(name="note_cleaner", description="Clean notes")
+            note_tool = NoteTool()
 
             total_notes_deleted = 0
             for session_id in session_ids_to_clear:

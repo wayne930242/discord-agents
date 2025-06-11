@@ -1,12 +1,12 @@
-"""
-Admin API endpoints for system management
-"""
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Dict, Any
 from discord_agents.core.security import get_current_user
-from discord_agents.core.migration import check_migration_needed, run_migrations, create_migration
+from discord_agents.core.migration import (
+    check_migration_needed,
+    run_migrations,
+    create_migration,
+)
 from discord_agents.utils.logger import get_logger
 
 logger = get_logger("admin_api")
@@ -24,7 +24,9 @@ class MigrationStatus(BaseModel):
 
 
 @router.get("/migration/status", response_model=Dict[str, Any])
-async def get_migration_status(current_user: str = Depends(get_current_user)):
+async def get_migration_status(
+    current_user: str = Depends(get_current_user),
+) -> Dict[str, Any]:
     """Get current migration status"""
     try:
         from alembic.runtime.migration import MigrationContext
@@ -44,19 +46,23 @@ async def get_migration_status(current_user: str = Depends(get_current_user)):
                 "migration_needed": current_rev != head_rev,
                 "current_revision": current_rev,
                 "head_revision": head_rev,
-                "status": "up_to_date" if current_rev == head_rev else "migration_needed"
+                "status": (
+                    "up_to_date" if current_rev == head_rev else "migration_needed"
+                ),
             }
 
     except Exception as e:
         logger.error(f"Failed to get migration status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get migration status: {str(e)}"
+            detail=f"Failed to get migration status: {str(e)}",
         )
 
 
 @router.post("/migration/upgrade")
-async def upgrade_database(current_user: str = Depends(get_current_user)):
+async def upgrade_database(
+    current_user: str = Depends(get_current_user),
+) -> Dict[str, Any]:
     """Manually trigger database upgrade"""
     try:
         logger.info(f"Manual migration triggered by user: {current_user}")
@@ -70,45 +76,49 @@ async def upgrade_database(current_user: str = Depends(get_current_user)):
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Migration failed"
+                detail="Migration failed",
             )
 
     except Exception as e:
         logger.error(f"Manual migration failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Migration failed: {str(e)}"
+            detail=f"Migration failed: {str(e)}",
         )
 
 
 @router.post("/migration/create")
 async def create_new_migration(
-    request: MigrationRequest,
-    current_user: str = Depends(get_current_user)
-):
+    request: MigrationRequest, current_user: str = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Create a new migration"""
     try:
         logger.info(f"Creating migration '{request.message}' by user: {current_user}")
 
         success = create_migration(request.message)
         if success:
-            return {"message": f"Migration '{request.message}' created successfully", "success": True}
+            return {
+                "message": f"Migration '{request.message}' created successfully",
+                "success": True,
+            }
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create migration"
+                detail="Failed to create migration",
             )
 
     except Exception as e:
         logger.error(f"Failed to create migration: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create migration: {str(e)}"
+            detail=f"Failed to create migration: {str(e)}",
         )
 
 
 @router.get("/system/info")
-async def get_system_info(current_user: str = Depends(get_current_user)):
+async def get_system_info(
+    current_user: str = Depends(get_current_user),
+) -> Dict[str, Any]:
     """Get system information"""
     try:
         from discord_agents.core.config import settings
@@ -122,16 +132,20 @@ async def get_system_info(current_user: str = Depends(get_current_user)):
             db.close()
 
         return {
-            "database_url": settings.database_url.split("@")[-1] if "@" in settings.database_url else "local",
+            "database_url": (
+                settings.database_url.split("@")[-1]
+                if "@" in settings.database_url
+                else "local"
+            ),
             "auto_migrate": settings.auto_migrate,
             "bot_count": bot_count,
             "cors_origins": settings.cors_origins,
-            "admin_user": current_user
+            "admin_user": current_user,
         }
 
     except Exception as e:
         logger.error(f"Failed to get system info: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system info: {str(e)}"
+            detail=f"Failed to get system info: {str(e)}",
         )

@@ -1,8 +1,19 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, DateTime, Index, DECIMAL
-from sqlalchemy.orm import relationship, DeclarativeBase
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    ForeignKey,
+    JSON,
+    DateTime,
+    Index,
+    DECIMAL,
+)
+from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from datetime import datetime
 from typing import TYPE_CHECKING
 import sqlalchemy as sa
+from decimal import Decimal
 
 if TYPE_CHECKING:
     from discord_agents.domain.bot import MyBot, MyBotInitConfig, MyAgentSetupConfig
@@ -102,28 +113,41 @@ class NoteModel(Base):
 class TokenUsageModel(Base):
     __tablename__ = "token_usage"
 
-    id = Column(Integer, primary_key=True)
-    agent_id = Column(Integer, ForeignKey("my_agents.id"), nullable=False)
-    agent_name = Column(String(100), nullable=False)  # Denormalized for easier querying
-    model_name = Column(String(100), nullable=False)
+    # Using SQLAlchemy 2.0 style throughout
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    agent_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("my_agents.id"), nullable=False
+    )
+    agent_name: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )  # Denormalized for easier querying
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     # Time period tracking
-    year = Column(Integer, nullable=False)
-    month = Column(Integer, nullable=False)  # 1-12
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-12
 
     # Token counts
-    input_tokens = Column(Integer, nullable=False, default=0)
-    output_tokens = Column(Integer, nullable=False, default=0)
-    total_tokens = Column(Integer, nullable=False, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Cost calculations (in USD)
-    input_cost = Column(DECIMAL(precision=10, scale=6), nullable=False, default=0.0)
-    output_cost = Column(DECIMAL(precision=10, scale=6), nullable=False, default=0.0)
-    total_cost = Column(DECIMAL(precision=10, scale=6), nullable=False, default=0.0)
+    input_cost: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=10, scale=6), nullable=False, default=0.0
+    )
+    output_cost: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=10, scale=6), nullable=False, default=0.0
+    )
+    total_cost: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=10, scale=6), nullable=False, default=0.0
+    )
 
     # Metadata
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
@@ -133,12 +157,14 @@ class TokenUsageModel(Base):
     # Create composite unique constraint to prevent duplicate records for same agent/model/month
     # Create indexes for efficient querying
     __table_args__ = (
-        sa.UniqueConstraint('agent_id', 'model_name', 'year', 'month', name='unique_agent_model_month'),
+        sa.UniqueConstraint(
+            "agent_id", "model_name", "year", "month", name="unique_agent_model_month"
+        ),
         Index("ix_token_usage_agent_id", "agent_id"),
         Index("ix_token_usage_model_name", "model_name"),
         Index("ix_token_usage_year_month", "year", "month"),
         Index("ix_token_usage_agent_year_month", "agent_id", "year", "month"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<TokenUsage(agent={self.agent_name}, model={self.model_name}, {self.year}-{self.month:02d}, tokens={self.total_tokens}, cost=${self.total_cost})>"

@@ -147,11 +147,23 @@ async def get_model_pricing(
     """Get pricing information for all available models"""
     models = []
     for llm in LLMs.llm_list:
+        model_name = llm["model"]
+        input_price = llm["input_price_per_1M"]
+        output_price = llm["output_price_per_1M"]
+
         models.append(
             ModelPricing(
-                model_name=llm["model"],
-                input_price_per_1M=llm["input_price_per_1M"],
-                output_price_per_1M=llm["output_price_per_1M"],
+                model_name=str(model_name) if model_name is not None else "",
+                input_price_per_1M=(
+                    float(input_price)
+                    if isinstance(input_price, (int, float, str))
+                    else 0.0
+                ),
+                output_price_per_1M=(
+                    float(output_price)
+                    if isinstance(output_price, (int, float, str))
+                    else 0.0
+                ),
             )
         )
     return ModelPricingList(models=models)

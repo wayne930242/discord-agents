@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Database migration management script
-Used to manage the migration from Flask-SQLAlchemy to pure SQLAlchemy
+Used to manage Alembic database migrations
 """
 
 import sys
@@ -16,37 +16,37 @@ def run_command(cmd: str) -> int:
     return result.returncode
 
 
-def check_migration_status():
+def check_migration_status() -> int:
     """Check migration status"""
     print("📋 Check migration status...")
     return run_command("alembic current")
 
 
-def create_migration(message: str):
+def create_migration(message: str) -> int:
     """Create new migration"""
     print(f"📝 Create migration: {message}")
     return run_command(f'alembic revision --autogenerate -m "{message}"')
 
 
-def upgrade_database():
+def upgrade_database() -> int:
     """Upgrade database to latest version"""
     print("⬆️ Upgrade database...")
     return run_command("alembic upgrade head")
 
 
-def downgrade_database(revision: str = "-1"):
+def downgrade_database(revision: str = "-1") -> int:
     """Downgrade database"""
     print(f"⬇️ Downgrade database to: {revision}")
     return run_command(f"alembic downgrade {revision}")
 
 
-def show_history():
+def show_history() -> int:
     """Show migration history"""
     print("📚 Migration history:")
     return run_command("alembic history --verbose")
 
 
-def main():
+def main() -> int:
     """Main function"""
     if len(sys.argv) < 2:
         print(

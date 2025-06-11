@@ -3,7 +3,12 @@ from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends, Request
-from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer
+from fastapi.security import (
+    HTTPBasic,
+    HTTPBasicCredentials,
+    HTTPBearer,
+    HTTPAuthorizationCredentials,
+)
 from discord_agents.core.config import settings
 
 # Password hashing
@@ -59,9 +64,11 @@ def verify_token(token: str) -> Optional[str]:
         return None
 
 
-def get_current_user_jwt(token: str = Depends(bearer_security)) -> str:
+def get_current_user_jwt(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_security),
+) -> str:
     """Get current authenticated user from JWT token"""
-    username = verify_token(token.credentials)
+    username = verify_token(credentials.credentials)
     if username is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

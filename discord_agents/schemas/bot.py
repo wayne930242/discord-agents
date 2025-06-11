@@ -42,7 +42,7 @@ class BotBase(BaseModel):
 
     @field_validator("dm_whitelist", "srv_whitelist", mode="before")
     @classmethod
-    def convert_ids_to_strings(cls, v):
+    def convert_ids_to_strings(cls, v: Any) -> Any:
         """Convert integer IDs to strings for Discord IDs"""
         if isinstance(v, list):
             return [str(item) for item in v]
@@ -64,7 +64,7 @@ class BotUpdate(BaseModel):
 
     @field_validator("dm_whitelist", "srv_whitelist", mode="before")
     @classmethod
-    def convert_ids_to_strings(cls, v):
+    def convert_ids_to_strings(cls, v: Any) -> Any:
         """Convert integer IDs to strings for Discord IDs"""
         if isinstance(v, list):
             return [str(item) for item in v]

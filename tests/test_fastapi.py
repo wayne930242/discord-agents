@@ -17,7 +17,7 @@ from discord_agents.core.config import settings
 from discord_agents.models.bot import BotModel, AgentModel
 
 
-@pytest.fixture(scope="function")  # 每個測試函數都有獨立的 client 和資料庫
+@pytest.fixture(scope="function")
 def client() -> Generator[TestClient, None, None]:
     """Create test client with isolated test database for each test"""
     # Create temporary database file for this test
@@ -83,7 +83,7 @@ def sample_agent() -> Dict[str, Any]:
         "description": "這是一個測試代理",
         "role_instructions": "你是一個測試助手",
         "tool_instructions": "使用可用的工具來幫助用戶",
-        "agent_model": "gemini-2.5-flash-preview-04-17",
+        "agent_model": "gemini-2.5-flash-preview-05-20",
         "tools": ["search", "math"],
     }
 

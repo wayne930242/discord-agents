@@ -1,12 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 import os
 import sys
 import base64
 from datetime import datetime
-from typing import Dict, Any, Generator
+from typing import Dict, Any, Generator, Iterator
 import tempfile
 
 # Add project root to path
@@ -44,7 +44,7 @@ def client() -> Generator[TestClient, None, None]:
             description="Test Agent for Token Usage",
             role_instructions="You are a test agent",
             tool_instructions="Use available tools",
-            agent_model="gemini-2.5-flash-preview",
+            agent_model="gemini-2.5-flash-preview-05-20",
             tools=["search"],
         )
         db.add(test_agent)
@@ -52,7 +52,7 @@ def client() -> Generator[TestClient, None, None]:
     finally:
         db.close()
 
-    def override_get_db():
+    def override_get_db() -> Iterator[Session]:
         """Override database dependency for testing"""
         try:
             db = TestingSessionLocal()
@@ -132,7 +132,7 @@ class TestTokenUsageAPI:
         self, client: TestClient, auth_headers: Dict[str, str]
     ) -> None:
         """Test get specific model pricing endpoint"""
-        model_name = "gemini-2.5-flash-preview"
+        model_name = "gemini-2.5-flash-preview-05-20"
         response = client.get(
             f"/api/v1/token-usage/models/{model_name}/pricing", headers=auth_headers
         )
@@ -162,7 +162,7 @@ class TestTokenUsageAPI:
         usage_data = {
             "agent_id": 1,
             "agent_name": "Test Agent",
-            "model_name": "gemini-2.5-flash-preview",
+            "model_name": "gemini-2.5-flash-preview-05-20",
             "input_tokens": 1000,
             "output_tokens": 500,
         }
@@ -180,10 +180,11 @@ class TestTokenUsageAPI:
         assert data["model_name"] == usage_data["model_name"]
         assert data["input_tokens"] == usage_data["input_tokens"]
         assert data["output_tokens"] == usage_data["output_tokens"]
-        assert (
-            data["total_tokens"]
-            == usage_data["input_tokens"] + usage_data["output_tokens"]
-        )
+        input_tokens = usage_data["input_tokens"]
+        output_tokens = usage_data["output_tokens"]
+        assert isinstance(input_tokens, int) and isinstance(output_tokens, int)
+        expected_total = input_tokens + output_tokens
+        assert data["total_tokens"] == expected_total
         assert "total_cost" in data
         assert isinstance(data["total_cost"], (int, float))
         assert data["total_cost"] >= 0
@@ -195,7 +196,7 @@ class TestTokenUsageAPI:
         invalid_data = {
             "agent_id": "invalid",  # Should be int
             "agent_name": "Test Agent",
-            "model_name": "gemini-2.5-flash-preview",
+            "model_name": "gemini-2.5-flash-preview-05-20",
             "input_tokens": -100,  # Should be non-negative
             "output_tokens": 500,
         }
@@ -289,7 +290,7 @@ class TestTokenUsageAPI:
 
         # Test with model filter
         response = client.get(
-            "/api/v1/token-usage/trend/monthly?model_name=gemini-2.5-flash-preview",
+            "/api/v1/token-usage/trend/monthly?model_name=gemini-2.5-flash-preview-05-20",
             headers=auth_headers,
         )
         assert response.status_code == 200
@@ -389,7 +390,7 @@ class TestTokenUsageAPIIntegration:
         usage_data = {
             "agent_id": 1,
             "agent_name": "Test Agent",
-            "model_name": "gemini-2.5-flash-preview",
+            "model_name": "gemini-2.5-flash-preview-05-20",
             "input_tokens": 100,
             "output_tokens": 50,
         }

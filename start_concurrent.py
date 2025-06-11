@@ -9,16 +9,17 @@ import os
 import signal
 import time
 from pathlib import Path
+from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 
 class ConcurrentDevServer:
-    def __init__(self):
+    def __init__(self) -> None:
         self.shutdown_event = threading.Event()
-        self.processes = {}
+        self.processes: Dict[str, subprocess.Popen[str]] = {}
 
-    def run_backend(self):
+    def run_backend(self) -> str:
         """Run backend server"""
         print("🚀 [Backend] Start FastAPI backend server...")
 
@@ -44,10 +45,13 @@ class ConcurrentDevServer:
 
             # 監控輸出
             while not self.shutdown_event.is_set():
-                line = process.stdout.readline()
-                if line:
-                    print(f"[Backend] {line.strip()}")
-                elif process.poll() is not None:
+                if process.stdout:
+                    line = process.stdout.readline()
+                    if line:
+                        print(f"[Backend] {line.strip()}")
+                    elif process.poll() is not None:
+                        break
+                else:
                     break
 
             return "Backend completed"
@@ -56,7 +60,7 @@ class ConcurrentDevServer:
             print(f"❌ [Backend] Error: {e}")
             return f"Backend error: {e}"
 
-    def run_frontend(self):
+    def run_frontend(self) -> str:
         """Run frontend development server"""
         print("🎨 [Frontend] Start React frontend development server...")
         frontend_dir = Path(__file__).parent / "frontend"
@@ -93,10 +97,13 @@ class ConcurrentDevServer:
 
             # Monitor output
             while not self.shutdown_event.is_set():
-                line = process.stdout.readline()
-                if line:
-                    print(f"[Frontend] {line.strip()}")
-                elif process.poll() is not None:
+                if process.stdout:
+                    line = process.stdout.readline()
+                    if line:
+                        print(f"[Frontend] {line.strip()}")
+                    elif process.poll() is not None:
+                        break
+                else:
                     break
 
             return "Frontend completed"
@@ -105,12 +112,12 @@ class ConcurrentDevServer:
             print(f"❌ [Frontend] Error: {e}")
             return f"Frontend error: {e}"
 
-    def signal_handler(self, signum, frame):
+    def signal_handler(self, signum: int, frame: Any) -> None:
         """Handle interrupt signal"""
         print(f"\n🛑 Received signal {signum}, shutting down servers...")
         self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shut down all servers"""
         self.shutdown_event.set()
 
@@ -132,7 +139,7 @@ class ConcurrentDevServer:
 
         print("👋 All servers shut down")
 
-    def run(self):
+    def run(self) -> None:
         """Run servers using ThreadPoolExecutor"""
         # Register signal handlers
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -178,7 +185,7 @@ class ConcurrentDevServer:
             self.shutdown()
 
 
-def main():
+def main() -> None:
     """Main function"""
     # Check if in the correct directory
     if not Path("discord_agents").exists():

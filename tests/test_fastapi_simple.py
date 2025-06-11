@@ -1,7 +1,3 @@
-"""
-Simple FastAPI tests for Discord Agents
-"""
-
 import pytest
 from fastapi.testclient import TestClient
 import os

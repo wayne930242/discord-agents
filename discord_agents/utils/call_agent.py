@@ -1,7 +1,7 @@
 from google.genai import types
 from google.adk.runners import Runner
 from google.adk.events import Event
-from typing import AsyncGenerator, Optional, Union
+from typing import AsyncGenerator, Optional, Union, Any
 from result import Result, Ok, Err
 import tiktoken
 import time
@@ -85,7 +85,7 @@ def trim_history(
 
 
 def _get_history_and_prompt(
-    broker_client, model: str, query: str, max_tokens: Union[int, float]
+    broker_client: Any, model: str, query: str, max_tokens: Union[int, float]
 ) -> Result[tuple[str, bool, int], str]:
     try:
         history_items = broker_client.get_message_history(model)

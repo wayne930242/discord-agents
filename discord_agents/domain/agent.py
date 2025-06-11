@@ -22,7 +22,7 @@ class LLM_TYPE(Enum):
 class LLMs:
     llm_list = [
         {
-            "model": "gemini-2.5-flash-preview",
+            "model": "gemini-2.5-flash-preview-05-20",
             "agent": LLM_TYPE.GEMINI,
             "input_price_per_1M": 0.15,
             "output_price_per_1M": 0.60,
@@ -30,6 +30,16 @@ class LLMs:
                 "max_tokens": float("inf"),
             },
             "notes": "思考模式下 output 價格為 $3.50，音頻輸入為 $1.00",
+        },
+        {
+            "model": "gemini-2.5-flash-preview",
+            "agent": LLM_TYPE.GEMINI,
+            "input_price_per_1M": 0.15,
+            "output_price_per_1M": 0.60,
+            "restrictions": {
+                "max_tokens": float("inf"),
+            },
+            "notes": "Legacy model name for compatibility",
         },
         {
             "model": "gemini-2.5-pro-preview",
@@ -163,7 +173,7 @@ class LLMs:
 
     @staticmethod
     def get_models_below_price(
-        max_input_price: float, max_output_price: float = None
+        max_input_price: float, max_output_price: Optional[float] = None
     ) -> List[str]:
         """Get models below specified price thresholds.
 
@@ -175,7 +185,7 @@ class LLMs:
             max_output_price = max_input_price * 4
 
         return [
-            llm["model"]
+            str(llm["model"])
             for llm in LLMs.llm_list
             if llm["input_price_per_1M"] < max_input_price and llm["output_price_per_1M"] < max_output_price  # type: ignore
         ]

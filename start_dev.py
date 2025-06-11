@@ -10,14 +10,15 @@ import signal
 import time
 import threading
 from pathlib import Path
+from typing import Optional, List, Tuple, Any
 
 
 class DevServer:
-    def __init__(self):
-        self.processes = []
+    def __init__(self) -> None:
+        self.processes: List[Tuple[str, subprocess.Popen]] = []
         self.running = True
 
-    def start_backend(self):
+    def start_backend(self) -> Optional[subprocess.Popen]:
         """Start FastAPI backend"""
         print("🚀 Start FastAPI backend server...")
         try:
@@ -42,12 +43,13 @@ class DevServer:
             self.processes.append(("Backend", backend_process))
 
             # 在背景執行緒中監控輸出
-            def monitor_backend():
-                for line in iter(backend_process.stdout.readline, ""):
-                    if self.running:
-                        print(f"[Backend] {line.strip()}")
-                    else:
-                        break
+            def monitor_backend() -> None:
+                if backend_process.stdout:
+                    for line in iter(backend_process.stdout.readline, ""):
+                        if self.running:
+                            print(f"[Backend] {line.strip()}")
+                        else:
+                            break
 
             threading.Thread(target=monitor_backend, daemon=True).start()
             return backend_process
@@ -56,7 +58,7 @@ class DevServer:
             print(f"❌ Start backend failed: {e}")
             return None
 
-    def start_frontend(self):
+    def start_frontend(self) -> Optional[subprocess.Popen[str]]:
         """Start React frontend development server"""
         print("🎨 Start React frontend development server...")
         frontend_dir = Path(__file__).parent / "frontend"
@@ -66,7 +68,7 @@ class DevServer:
             return None
 
         try:
-            # 檢查是否有 node_modules
+            # Check node_modules
             if not (frontend_dir / "node_modules").exists():
                 print("📦 Installing frontend dependencies...")
                 install_process = subprocess.run(
@@ -93,12 +95,13 @@ class DevServer:
             self.processes.append(("Frontend", frontend_process))
 
             # Monitor output in background thread
-            def monitor_frontend():
-                for line in iter(frontend_process.stdout.readline, ""):
-                    if self.running:
-                        print(f"[Frontend] {line.strip()}")
-                    else:
-                        break
+            def monitor_frontend() -> None:
+                if frontend_process.stdout:
+                    for line in iter(frontend_process.stdout.readline, ""):
+                        if self.running:
+                            print(f"[Frontend] {line.strip()}")
+                        else:
+                            break
 
             threading.Thread(target=monitor_frontend, daemon=True).start()
             return frontend_process
@@ -107,12 +110,12 @@ class DevServer:
             print(f"❌ Start frontend failed: {e}")
             return None
 
-    def signal_handler(self, signum, frame):
+    def signal_handler(self, signum: int, frame: Any) -> None:
         """Handle interrupt signal"""
         print(f"\n🛑 Received signal {signum}, shutting down servers...")
         self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shut down all processes"""
         self.running = False
         print("🔄 Shutting down all servers...")
@@ -136,7 +139,7 @@ class DevServer:
         print("👋 All servers shut down")
         sys.exit(0)
 
-    def run(self):
+    def run(self) -> None:
         """Run development servers"""
         # Register signal handlers
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -189,7 +192,7 @@ class DevServer:
             self.shutdown()
 
 
-def main():
+def main() -> None:
     """Main function"""
     # Check if in the correct directory
     if not Path("discord_agents").exists():
