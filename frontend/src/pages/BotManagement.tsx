@@ -20,21 +20,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { Plus, Settings, Play, Trash2, Square, LogOut } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Plus, Settings, Play, Trash2, Square } from "lucide-react";
+
 import {
   botAPI,
   agentAPI,
-  authAPI,
   type Bot,
   type BotCreate,
   type Agent,
 } from "@/lib/api";
 import { BotEditDialog } from "@/components/BotEditDialog";
 import { AgentEditDialog } from "@/components/AgentEditDialog";
+import { Layout } from "@/components/Layout";
 
 export function BotManagement() {
-  const navigate = useNavigate();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingBot, setEditingBot] = useState<Bot | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
@@ -48,11 +47,6 @@ export function BotManagement() {
   });
 
   const queryClient = useQueryClient();
-
-  const handleLogout = () => {
-    authAPI.logout();
-    navigate("/login");
-  };
 
   // Fetch bots data
   const {
@@ -200,29 +194,18 @@ export function BotManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight">機器人管理</h1>
-          <p className="text-muted-foreground mt-2">
-            管理你的 Discord 機器人配置和狀態
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            登出
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/">返回首頁</Link>
-          </Button>
-          <Button onClick={() => setShowCreateForm(!showCreateForm)}>
-            <Plus className="h-4 w-4 mr-2" />
-            新增機器人
-          </Button>
-        </div>
-      </div>
-
+    <Layout
+      title="機器人管理"
+      subtitle="管理你的 Discord 機器人配置和狀態"
+      showBackButton
+      backTo="/dashboard"
+      extraActions={
+        <Button onClick={() => setShowCreateForm(!showCreateForm)}>
+          <Plus className="h-4 w-4 mr-2" />
+          新增機器人
+        </Button>
+      }
+    >
       {showCreateForm && (
         <Card className="mb-6">
           <CardHeader>
@@ -390,6 +373,6 @@ export function BotManagement() {
         open={!!editingAgent}
         onOpenChange={(open) => !open && setEditingAgent(null)}
       />
-    </div>
+    </Layout>
   );
 }

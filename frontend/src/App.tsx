@@ -3,6 +3,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { BotManagement } from "./pages/BotManagement";
+import { UsageAnalytics } from "./pages/UsageAnalytics";
 import { Login } from "./pages/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -25,10 +26,26 @@ function App() {
               }
             />
             <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/bots"
               element={
                 <ProtectedRoute>
                   <BotManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/usage"
+              element={
+                <ProtectedRoute>
+                  <UsageAnalytics />
                 </ProtectedRoute>
               }
             />

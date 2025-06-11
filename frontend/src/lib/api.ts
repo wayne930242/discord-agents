@@ -139,6 +139,72 @@ export interface BotUpdate {
   agent_id?: number;
 }
 
+// Token Usage Types
+export interface TokenUsage {
+  id: number;
+  agent_id: number;
+  agent_name: string;
+  model_name: string;
+  year: number;
+  month: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  input_cost: number;
+  output_cost: number;
+  total_cost: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsageSummaryByAgent {
+  agent_id: number;
+  agent_name: string;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_input_cost: number;
+  total_output_cost: number;
+  total_cost: number;
+}
+
+export interface UsageSummaryByModel {
+  model_name: string;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_input_cost: number;
+  total_output_cost: number;
+  total_cost: number;
+}
+
+export interface MonthlyTrend {
+  year: number;
+  month: number;
+  month_year: string;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_input_cost: number;
+  total_output_cost: number;
+  total_cost: number;
+}
+
+export interface TotalCost {
+  total_input_cost: number;
+  total_output_cost: number;
+  total_cost: number;
+}
+
+export interface ModelPricing {
+  model_name: string;
+  input_price_per_1M: number;
+  output_price_per_1M: number;
+  max_tokens?: number;
+  context_window?: number;
+  notes?: string;
+}
+
 // Auth API
 export const authAPI = {
   async login(username: string, password: string) {
@@ -231,6 +297,117 @@ export const agentAPI = {
 
   async updateAgent(agentId: number, agent: Partial<Agent>): Promise<Agent> {
     const response = await api.put(`/bots/agents/${agentId}`, agent);
+    return response.data;
+  },
+};
+
+// Token Usage API
+export const tokenUsageAPI = {
+  async getAllUsage(params?: {
+    year?: number;
+    month?: number;
+  }): Promise<TokenUsage[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.year) queryParams.append("year", params.year.toString());
+    if (params?.month) queryParams.append("month", params.month.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/all?${queryParams}`
+      : "/token-usage/all";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getAgentUsage(
+    agentId: number,
+    params?: { year?: number; month?: number }
+  ): Promise<TokenUsage[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.year) queryParams.append("year", params.year.toString());
+    if (params?.month) queryParams.append("month", params.month.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/agent/${agentId}?${queryParams}`
+      : `/token-usage/agent/${agentId}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getSummaryByAgent(params?: {
+    year?: number;
+    month?: number;
+  }): Promise<UsageSummaryByAgent[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.year) queryParams.append("year", params.year.toString());
+    if (params?.month) queryParams.append("month", params.month.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/summary/by-agent?${queryParams}`
+      : "/token-usage/summary/by-agent";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getSummaryByModel(params?: {
+    year?: number;
+    month?: number;
+  }): Promise<UsageSummaryByModel[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.year) queryParams.append("year", params.year.toString());
+    if (params?.month) queryParams.append("month", params.month.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/summary/by-model?${queryParams}`
+      : "/token-usage/summary/by-model";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getMonthlyTrend(params?: {
+    agentId?: number;
+    modelName?: string;
+    limit?: number;
+  }): Promise<MonthlyTrend[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.agentId)
+      queryParams.append("agent_id", params.agentId.toString());
+    if (params?.modelName) queryParams.append("model_name", params.modelName);
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/trend/monthly?${queryParams}`
+      : "/token-usage/trend/monthly";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getTotalCost(params?: {
+    agentId?: number;
+    year?: number;
+    month?: number;
+  }): Promise<TotalCost> {
+    const queryParams = new URLSearchParams();
+    if (params?.agentId)
+      queryParams.append("agent_id", params.agentId.toString());
+    if (params?.year) queryParams.append("year", params.year.toString());
+    if (params?.month) queryParams.append("month", params.month.toString());
+
+    const url = queryParams.toString()
+      ? `/token-usage/cost/total?${queryParams}`
+      : "/token-usage/cost/total";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getModelPricing(): Promise<{ models: ModelPricing[] }> {
+    const response = await api.get("/token-usage/models/pricing");
+    return response.data;
+  },
+
+  async getModelPricingByName(modelName: string): Promise<ModelPricing> {
+    const response = await api.get(
+      `/token-usage/models/${encodeURIComponent(modelName)}/pricing`
+    );
     return response.data;
   },
 };
