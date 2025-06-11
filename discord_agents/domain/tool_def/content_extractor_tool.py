@@ -3,9 +3,12 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import FunctionTool
 from crawl4ai import AsyncWebCrawler  # type: ignore
 from typing import Dict, Any
+import os
 
 
-async def _extract_content_from_url(url: str, include_headers: bool = True) -> Dict[str, Any]:
+async def _extract_content_from_url(
+    url: str, include_headers: bool = True
+) -> Dict[str, Any]:
     """
     Extract content from a URL using Crawl4AI.
 
@@ -17,7 +20,26 @@ async def _extract_content_from_url(url: str, include_headers: bool = True) -> D
         Dict[str, Any]: Extraction results
     """
     try:
-        async with AsyncWebCrawler() as crawler:
+        # Configure browser arguments for Docker environment
+        crawler_config = {}
+
+        # Check if we're in a Docker environment and add browser args
+        if os.path.exists("/.dockerenv") or os.environ.get("DOCKER_CONTAINER"):
+            crawler_config["args"] = [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-features=TranslateUI",
+                "--disable-ipc-flooding-protection",
+            ]
+
+        async with AsyncWebCrawler(**crawler_config) as crawler:
             result = await crawler.arun(url=url, include_headers=include_headers)
             page_title = getattr(result, "title", None)
             if page_title is None:
