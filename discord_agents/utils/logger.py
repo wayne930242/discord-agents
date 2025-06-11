@@ -39,15 +39,19 @@ def setup_custom_logging() -> None:
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Set root logger level
-    root_logger.setLevel(logging.DEBUG)
+    # Get log level from environment variable, default to INFO
+    log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # Set root logger level to configurable level
+    root_logger.setLevel(log_level)
 
     log_fmt = "%(asctime)s - %(levelname)s - %(message)s (%(name)s)"
     date_fmt = "%Y-%m-%d %H:%M:%S"
 
-    # Console handler
+    # Console handler - use configurable log level
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(log_level)
     if console_handler.stream.isatty():
         formatter: Union[ColoredFormatter, logging.Formatter] = ColoredFormatter(
             log_fmt, datefmt=date_fmt
@@ -57,7 +61,7 @@ def setup_custom_logging() -> None:
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # File handler
+    # File handler - keep DEBUG level for file logging
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)
     file_handler = logging.FileHandler(
@@ -67,10 +71,28 @@ def setup_custom_logging() -> None:
     file_handler.setFormatter(logging.Formatter(log_fmt, datefmt=date_fmt))
     root_logger.addHandler(file_handler)
 
-    # Set third-party library log levels
+    # Set third-party library log levels to reduce noise
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("fastapi").setLevel(logging.INFO)
+
+    # Reduce Discord.py debug logs
+    logging.getLogger("discord").setLevel(logging.WARNING)
+    logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+    logging.getLogger("discord.client").setLevel(logging.WARNING)
+    logging.getLogger("discord.http").setLevel(logging.WARNING)
+
+    # Reduce LiteLLM debug logs
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    logging.getLogger("litellm").setLevel(logging.WARNING)
+
+    # Reduce httpcore/httpx debug logs
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # Reduce other common noisy loggers
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
 
     _logging_configured = True
 
@@ -87,7 +109,7 @@ def get_logger(name: str) -> logging.Logger:
 
     # 如果全域 logging 尚未設定且此 logger 沒有 handler，建立基本設定
     if not logger.handlers:
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
         # 設定 propagate 為 False，避免與 root logger 重複
         logger.propagate = False
 
@@ -96,7 +118,7 @@ def get_logger(name: str) -> logging.Logger:
 
         # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.INFO)
         if console_handler.stream.isatty():
             formatter: Union[ColoredFormatter, logging.Formatter] = ColoredFormatter(
                 log_fmt, datefmt=date_fmt
