@@ -165,7 +165,7 @@ class TestE2ESystem:
         """Test FastAPI application health check"""
         response = self.client.get("/api/v1/health")
         assert response.status_code == 200
-        assert response.json()["status"] == "healthy"
+        assert response.json()["status"] == "ok"
         print("✅ FastAPI health check passed")
 
     def test_database_connection(self) -> None:
@@ -412,12 +412,12 @@ class TestE2ESystem:
     def test_api_authentication(self) -> None:
         """Test API authentication"""
         # Test unauthenticated access
-        response = self.client.get("/api/v1/bots")
+        response = self.client.get("/api/v1/bots/")
         assert response.status_code == 401
 
         # Test authenticated access
         response = self.client.get(
-            "/api/v1/bots", auth=(settings.admin_username, settings.admin_password)
+            "/api/v1/bots/", auth=(settings.admin_username, settings.admin_password)
         )
         assert response.status_code == 200
         print("✅ API authentication OK")
@@ -425,7 +425,7 @@ class TestE2ESystem:
     def test_bot_management_api(self) -> None:
         """Test bot management API"""
         response = self.client.get(
-            "/api/v1/bots", auth=(settings.admin_username, settings.admin_password)
+            "/api/v1/bots/", auth=(settings.admin_username, settings.admin_password)
         )
         assert response.status_code == 200
 

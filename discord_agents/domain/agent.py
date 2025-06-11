@@ -22,104 +22,131 @@ class LLM_TYPE(Enum):
 class LLMs:
     llm_list = [
         {
-            "model": "gemini-2.5-flash-preview-04-17",
+            "model": "gemini-2.5-flash-preview",
             "agent": LLM_TYPE.GEMINI,
-            "price_per_1M": 0.26,
+            "input_price_per_1M": 0.15,
+            "output_price_per_1M": 0.60,
             "restrictions": {
                 "max_tokens": float("inf"),
             },
+            "notes": "思考模式下 output 價格為 $3.50，音頻輸入為 $1.00",
         },
         {
-            "model": "gemini-2.5-pro-preview-05-06",
+            "model": "gemini-2.5-pro-preview",
             "agent": LLM_TYPE.GEMINI,
-            "price_per_1M": 3.50,
+            "input_price_per_1M": 1.25,
+            "output_price_per_1M": 10.00,
             "restrictions": {
                 "max_tokens": float("inf"),
             },
+            "notes": "長上下文 (>200k tokens): 輸入 $2.50, 輸出 $15.00",
         },
         {
             "model": "gpt-4.1",
             "agent": LLM_TYPE.GPT,
-            "price_per_1M": 3.50,
+            "input_price_per_1M": 2.50,
+            "output_price_per_1M": 10.00,
             "restrictions": {
-                "max_tokens": float("inf"),
+                "max_tokens": 32768,
+                "context_window": 1047576,
             },
+            "notes": "支援 1M tokens 上下文，截止日期 2024年5月",
         },
         {
             "model": "gpt-4.1-nano",
             "agent": LLM_TYPE.GPT,
-            "price_per_1M": 0.17,
+            "input_price_per_1M": 0.10,
+            "output_price_per_1M": 0.40,
             "restrictions": {
-                "max_tokens": float("inf"),
+                "max_tokens": 32768,
+                "context_window": 1047576,
             },
+            "notes": "OpenAI 最便宜的模型，支援視覺輸入",
         },
         {
             "model": "gpt-4.1-mini",
             "agent": LLM_TYPE.GPT,
-            "price_per_1M": 0.70,
+            "input_price_per_1M": 0.50,
+            "output_price_per_1M": 2.00,
             "restrictions": {
-                "max_tokens": float("inf"),
+                "max_tokens": 32768,
+                "context_window": 1047576,
             },
+            "notes": "平衡性能與成本的模型",
         },
         {
             "model": "gpt-4o",
             "agent": LLM_TYPE.GPT,
-            "price_per_1M": 3.50,
+            "input_price_per_1M": 2.50,
+            "output_price_per_1M": 10.00,
             "restrictions": {
-                "max_tokens": float("inf"),
+                "max_tokens": 4096,
             },
+            "notes": "多模態旗艦模型",
         },
         {
             "model": "gpt-4o-mini",
             "agent": LLM_TYPE.GPT,
-            "price_per_1M": 0.26,
+            "input_price_per_1M": 0.15,
+            "output_price_per_1M": 0.60,
             "restrictions": {
-                "max_tokens": float("inf"),
+                "max_tokens": 16384,
             },
+            "notes": "成本效益型模型，支援視覺",
         },
         {
             "model": "xai/grok-3-mini",
             "agent": LLM_TYPE.GROK,
-            "price_per_1M": 0.35,
+            "input_price_per_1M": 0.20,
+            "output_price_per_1M": 0.80,
             "restrictions": {
                 "max_tokens": float("inf"),
+                "context_window": 1000000,
             },
+            "notes": "具備思考能力的輕量化推理模型",
         },
         {
             "model": "xai/grok-3",
             "agent": LLM_TYPE.GROK,
-            "price_per_1M": 6.00,
+            "input_price_per_1M": 3.00,
+            "output_price_per_1M": 12.00,
             "restrictions": {
                 "max_tokens": float("inf"),
+                "context_window": 1000000,
             },
+            "notes": "xAI 的旗艦推理模型，在數學和編程方面表現優異",
         },
         {
             "model": "claude-sonnet-4-20250514",
             "agent": LLM_TYPE.CLAUDE,
-            "price_per_1M": 8.50,
+            "input_price_per_1M": 3.00,
+            "output_price_per_1M": 15.00,
             "restrictions": {
-                "max_tokens": 20000,
-                "interval_seconds": 60,
-                "key": "claude_sonnet_4_20250514",
+                "max_tokens": 64000,
+                "context_window": 200000,
             },
+            "notes": "最新的 Claude Sonnet 4 模型，在編程方面有顯著提升",
         },
         {
             "model": "claude-3-7-sonnet-latest",
             "agent": LLM_TYPE.CLAUDE,
-            "price_per_1M": 8.50,
+            "input_price_per_1M": 3.00,
+            "output_price_per_1M": 15.00,
             "restrictions": {
-                "max_tokens": 20000,
-                "interval_seconds": 60,
-                "key": "claude_3_7_sonnet_latest",
+                "max_tokens": 64000,
+                "context_window": 200000,
             },
+            "notes": "Claude 3.7 混合推理模型",
         },
         {
             "model": "claude-3-5-haiku-latest",
             "agent": LLM_TYPE.CLAUDE,
-            "price_per_1M": 2.40,
+            "input_price_per_1M": 0.80,
+            "output_price_per_1M": 4.00,
             "restrictions": {
                 "max_tokens": float("inf"),
             },
+            "notes": "Anthropic 最快速的模型，適合高頻率使用",
         },
     ]
 
@@ -135,9 +162,22 @@ class LLMs:
         return [llm["model"] for llm in LLMs.llm_list]  # type: ignore
 
     @staticmethod
-    def get_models_below_price(max_price: float) -> List[str]:
+    def get_models_below_price(
+        max_input_price: float, max_output_price: float = None
+    ) -> List[str]:
+        """Get models below specified price thresholds.
+
+        Args:
+            max_input_price: Maximum input price per 1M tokens
+            max_output_price: Maximum output price per 1M tokens (optional, defaults to max_input_price * 4)
+        """
+        if max_output_price is None:
+            max_output_price = max_input_price * 4
+
         return [
-            llm["model"] for llm in LLMs.llm_list if llm["price_per_1M"] < max_price  # type: ignore
+            llm["model"]
+            for llm in LLMs.llm_list
+            if llm["input_price_per_1M"] < max_input_price and llm["output_price_per_1M"] < max_output_price  # type: ignore
         ]
 
     @staticmethod
@@ -149,6 +189,18 @@ class LLMs:
                     "interval_seconds", 0.0
                 )
         return float("inf"), 0.0
+
+    @staticmethod
+    def get_pricing(model_name: str) -> tuple[float, float]:
+        """Get input and output pricing for a model.
+
+        Returns:
+            tuple: (input_price_per_1M, output_price_per_1M)
+        """
+        for llm in LLMs.llm_list:
+            if llm["model"] == model_name:
+                return llm["input_price_per_1M"], llm["output_price_per_1M"]  # type: ignore
+        return 0.0, 0.0
 
 
 class MyAgent:

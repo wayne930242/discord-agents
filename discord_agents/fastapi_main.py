@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from discord_agents.api import auth, bots, health, admin
+from discord_agents.api import auth, bots, health, admin, token_usage
 from discord_agents.core.database import engine, Base
 from discord_agents.core.config import settings
 from discord_agents.utils.logger import get_logger, setup_custom_logging
@@ -93,6 +93,9 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(bots.router, prefix="/api/v1/bots", tags=["bots"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+app.include_router(
+    token_usage.router, prefix="/api/v1/token-usage", tags=["token-usage"]
+)
 
 # Serve static files (React build)
 static_dir = os.path.join(

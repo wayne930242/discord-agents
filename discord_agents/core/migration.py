@@ -1,10 +1,3 @@
-"""
-FastAPI 資料庫遷移管理模組
-在應用啟動時自動處理資料庫遷移
-"""
-
-import subprocess
-import sys
 from pathlib import Path
 from alembic import command
 from alembic.config import Config
@@ -14,8 +7,7 @@ logger = get_logger("migration")
 
 
 def get_alembic_config() -> Config:
-    """獲取 Alembic 配置"""
-    # 獲取專案根目錄
+    """Get Alembic config"""
     project_root = Path(__file__).parent.parent.parent
     alembic_ini_path = project_root / "alembic.ini"
 
@@ -27,11 +19,10 @@ def get_alembic_config() -> Config:
 
 
 def check_migration_needed() -> bool:
-    """檢查是否需要遷移"""
+    """Check if migration is needed"""
     try:
         config = get_alembic_config()
 
-        # 檢查當前版本和最新版本
         from alembic.runtime.migration import MigrationContext
         from alembic.script import ScriptDirectory
         from discord_agents.core.database import engine
@@ -50,16 +41,15 @@ def check_migration_needed() -> bool:
 
     except Exception as e:
         logger.warning(f"Could not check migration status: {e}")
-        return True  # 如果無法檢查，假設需要遷移
+        return True
 
 
 def run_migrations() -> bool:
-    """執行資料庫遷移"""
+    """Run database migrations"""
     try:
         logger.info("Starting database migrations...")
         config = get_alembic_config()
 
-        # 執行遷移
         command.upgrade(config, "head")
         logger.info("✅ Database migrations completed successfully")
         return True
@@ -70,7 +60,7 @@ def run_migrations() -> bool:
 
 
 def auto_migrate() -> None:
-    """自動遷移（在應用啟動時調用）"""
+    """Auto migrate (called when application starts)"""
     from discord_agents.core.config import settings
 
     if not settings.auto_migrate:
@@ -83,17 +73,15 @@ def auto_migrate() -> None:
             success = run_migrations()
             if not success:
                 logger.error("❌ Migration failed, application may not work correctly")
-                # 不要停止應用，讓它繼續運行
         else:
             logger.info("✅ Database is up to date, no migration needed")
 
     except Exception as e:
         logger.error(f"❌ Auto migration error: {e}")
-        # 不要停止應用，讓它繼續運行
 
 
 def create_migration(message: str) -> bool:
-    """創建新的遷移檔案"""
+    """Create new migration file"""
     try:
         logger.info(f"Creating migration: {message}")
         config = get_alembic_config()
