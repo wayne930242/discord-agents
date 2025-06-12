@@ -17,10 +17,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Edit, ArrowLeft, Bot, Settings, DollarSign } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Plus, Edit, Bot, Settings, DollarSign } from "lucide-react";
 import { agentAPI, type Agent } from "@/lib/api";
 import { AgentEditDialog } from "@/components/AgentEditDialog";
+import { Layout } from "@/components/Layout";
 
 export function AgentManagement() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -43,25 +43,18 @@ export function AgentManagement() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-8 flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <h1 className="text-4xl font-bold tracking-tight">Agent 管理</h1>
-          </div>
-          <p className="text-muted-foreground">創建和管理 AI Agent 配置</p>
-        </div>
+    <Layout
+      title="Agent 管理"
+      subtitle="創建和管理 AI Agent 配置"
+      showBackButton
+      backTo="/dashboard"
+      extraActions={
         <Button onClick={handleCreateAgent}>
           <Plus className="h-4 w-4 mr-2" />
           創建 Agent
         </Button>
-      </div>
-
+      }
+    >
       <div className="grid gap-6 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -188,6 +181,6 @@ export function AgentManagement() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
       />
-    </div>
+    </Layout>
   );
 }
