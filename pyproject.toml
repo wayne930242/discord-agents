@@ -1,10 +1,9 @@
 [project]
-name = "discord-agents"
+name = "fastapi-react-starter"
 version = "0.1.0"
-description = "Discord Agents"
+description = "FastAPI React Starter with Agent System"
 requires-python = ">=3.13"
 dependencies = [
-    "discord.py",
     # FastAPI stack
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
@@ -14,28 +13,32 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.6",
 
-    # Core dependencies
-    "google-cloud-aiplatform",
-    "google-genai",
-    "psycopg2-binary", # PostgreSQL 驅動
+    # FastAPI-Users for authentication
+    "fastapi-users[sqlalchemy]>=13.0.0",
+    "fastapi-users-db-sqlalchemy>=6.0.0",
+
+    # Database drivers
+    "psycopg2-binary", # PostgreSQL driver
     "python-dotenv>=1.1.0",
-    "google-adk[vertexai]>=0.5.0",
+
+    # Scheduling and task management (replaces Redis)
+    "apscheduler>=3.10.0",
+    "slowapi>=0.1.9",  # Rate limiting
+
+    # Core dependencies
     "asgiref>=3.7.0",
-    "langchain-community>=0.3.24",
     "pytz>=2025.2",
-    "redis>=6.1.0",
-    "redlock-py>=1.0.8",
-    "supervisor>=4.2.5",
-    "litellm>=1.70.2",
     "result>=0.17.0",
     "tiktoken>=0.9.0",
+    "pytest>=8.4.0",
+
+    # Optional AI/LLM support (can be extended)
+    "litellm>=1.70.2",
+
+    # Web scraping capabilities (optional)
     "crawl4ai>=0.6.3",
     "playwright>=1.52.0",
     "numexpr>=2.10.2",
-    "pytest>=8.4.0",
-    # FastAPI specific
-    "python-jose[cryptography]>=3.3.0",
-    "passlib[bcrypt]>=1.7.4",
 ]
 
 [build-system]
@@ -49,7 +52,6 @@ target-version = "py39"
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources.*",
-    "ignore::DeprecationWarning:discord.*",
     "ignore:pkg_resources is deprecated:DeprecationWarning",
     "ignore:Deprecated call to.*declare_namespace:DeprecationWarning",
     "ignore:parameter 'timeout' of type 'float' is deprecated:DeprecationWarning",
@@ -61,8 +63,5 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "types-psycopg2>=2.9.21.20250516",
     "types-pytz>=2025.2.0.20250516",
-    "types-redis>=4.6.0.20241004",
-
-    "types-python-jose>=3.3.4",
-    "types-passlib>=1.7.7",
+    "httpx>=0.25.0",  # For testing
 ]
