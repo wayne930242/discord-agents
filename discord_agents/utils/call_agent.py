@@ -5,6 +5,7 @@ from typing import AsyncGenerator, Optional, Union, Any
 from result import Result, Ok, Err
 import tiktoken
 import time
+import json
 
 from discord_agents.utils.logger import get_logger
 
@@ -52,11 +53,87 @@ async def call_agent_async(
 
 
 def count_tokens(text: str) -> int:
+    """Count tokens in text using tiktoken."""
+    if not text:
+        return 0
     try:
         enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
         return len(enc.encode(text))
     except Exception:
         return len(text)
+
+
+def count_function_call_tokens(function_call: Any) -> int:
+    """Count tokens in function call data."""
+    if not function_call:
+        return 0
+    try:
+        # Convert function call to JSON string for token counting
+        function_call_str = json.dumps({
+            "name": getattr(function_call, "name", ""),
+            "args": getattr(function_call, "args", {})
+        }, ensure_ascii=False)
+        return count_tokens(function_call_str)
+    except Exception as e:
+        logger.debug(f"Error counting function call tokens: {e}")
+        return 0
+
+
+def count_function_response_tokens(function_response: Any) -> int:
+    """Count tokens in function response data."""
+    if not function_response:
+        return 0
+    try:
+        # Convert function response to string for token counting
+        if hasattr(function_response, "response"):
+            response_str = str(function_response.response)
+        else:
+            response_str = str(function_response)
+        return count_tokens(response_str)
+    except Exception as e:
+        logger.debug(f"Error counting function response tokens: {e}")
+        return 0
+
+
+class TokenTracker:
+    """Track tokens for different types of content during agent execution."""
+
+    def __init__(self) -> None:
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.function_call_tokens = 0
+        self.function_response_tokens = 0
+        self.reasoning_tokens = 0
+
+    def add_input_tokens(self, tokens: int) -> None:
+        self.input_tokens += tokens
+
+    def add_output_tokens(self, tokens: int) -> None:
+        self.output_tokens += tokens
+
+    def add_function_call_tokens(self, tokens: int) -> None:
+        self.function_call_tokens += tokens
+
+    def add_function_response_tokens(self, tokens: int) -> None:
+        self.function_response_tokens += tokens
+
+    def add_reasoning_tokens(self, tokens: int) -> None:
+        self.reasoning_tokens += tokens
+
+    def get_total_tokens(self) -> int:
+        return (self.input_tokens + self.output_tokens +
+                self.function_call_tokens + self.function_response_tokens +
+                self.reasoning_tokens)
+
+    def get_summary(self) -> dict:
+        return {
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "function_call_tokens": self.function_call_tokens,
+            "function_response_tokens": self.function_response_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "total_tokens": self.get_total_tokens()
+        }
 
 
 def trim_history(
@@ -113,11 +190,12 @@ def _get_history_and_prompt(
 
 
 def _handle_event(
-    event: Event, only_final: bool, full_response_text: str
+    event: Event, only_final: bool, full_response_text: str, token_tracker: TokenTracker
 ) -> tuple[bool, Optional[str], str, bool]:
     try:
         logger.debug(f"Event details: {event}")
         logger.debug(f"Event type: {type(event).__name__}")
+
         if event.content and event.content.parts:
             for i, part in enumerate(event.content.parts):
                 logger.debug(f"Part {i} details:")
@@ -126,6 +204,18 @@ def _handle_event(
                 logger.debug(f"  Function response: {part.function_response}")
                 logger.debug(f"  Raw part: {part}")
 
+                # Count function call tokens
+                if part.function_call:
+                    func_call_tokens = count_function_call_tokens(part.function_call)
+                    token_tracker.add_function_call_tokens(func_call_tokens)
+                    logger.debug(f"Function call tokens: {func_call_tokens}")
+
+                # Count function response tokens
+                if part.function_response:
+                    func_response_tokens = count_function_response_tokens(part.function_response)
+                    token_tracker.add_function_response_tokens(func_response_tokens)
+                    logger.debug(f"Function response tokens: {func_response_tokens}")
+
         # Partial event
         if (
             getattr(event, "partial", False)
@@ -133,15 +223,25 @@ def _handle_event(
             and event.content.parts
             and event.content.parts[0].text
         ):
-            full_response_text += event.content.parts[0].text
+            text_content = event.content.parts[0].text
+            full_response_text += text_content
+            # Count partial response tokens as reasoning/output tokens
+            partial_tokens = count_tokens(text_content)
+            token_tracker.add_reasoning_tokens(partial_tokens)
             if not only_final:
-                return True, event.content.parts[0].text, full_response_text, False
+                return True, text_content, full_response_text, False
             return True, None, full_response_text, False
 
-        # Function call
+        # Function call event
         if hasattr(event, "get_function_calls") and event.get_function_calls():
+            function_calls = event.get_function_calls()
+            for func_call in function_calls:
+                func_call_tokens = count_function_call_tokens(func_call)
+                token_tracker.add_function_call_tokens(func_call_tokens)
+                logger.debug(f"Function call tokens: {func_call_tokens}")
             if not only_final:
                 return True, "（......）", full_response_text, False
+
         # Final event
         if event.is_final_response():
             logger.info(f"<<< Final event received (ID: {getattr(event, 'id', 'N/A')})")
@@ -152,12 +252,18 @@ def _handle_event(
                 and event.actions.escalate
             ):
                 escalation_message = f"⚠️ Error: {getattr(event, 'error_message', None) or 'No specific message.'}"
+                escalation_tokens = count_tokens(escalation_message)
+                token_tracker.add_output_tokens(escalation_tokens)
                 return False, escalation_message, "", True
             if event.content and event.content.parts:
                 final_text = (full_response_text + event.content.parts[0].text).strip()
+                final_tokens = count_tokens(event.content.parts[0].text)
+                token_tracker.add_output_tokens(final_tokens)
                 return False, final_text, "", True
             else:
-                return False, "⚠️ No response content.", "", True
+                no_response_msg = "⚠️ No response content."
+                token_tracker.add_output_tokens(count_tokens(no_response_msg))
+                return False, no_response_msg, "", True
 
         # Non-final event full content
         if (
@@ -167,8 +273,11 @@ def _handle_event(
             and not event.is_final_response()
         ):
             for part in event.content.parts:
-                if part.text and not only_final:
-                    return True, part.text, full_response_text, False
+                if part.text:
+                    text_tokens = count_tokens(part.text)
+                    token_tracker.add_reasoning_tokens(text_tokens)
+                    if not only_final:
+                        return True, part.text, full_response_text, False
         return True, None, full_response_text, False
 
     except Exception as event_error:
@@ -229,41 +338,43 @@ async def stream_agent_responses(
     full_response_text = ""
     final_response_yielded = False
 
-    # Track actual response for token counting
-    actual_response_text = ""
+    # Initialize token tracker
+    token_tracker = TokenTracker()
+    token_tracker.add_input_tokens(query_tokens)
 
     async for event in runner.run_async(
         user_id=user_id, session_id=session_id, new_message=user_content
     ):
         try:
             should_continue, yield_value, full_response_text, is_final = _handle_event(
-                event, only_final, full_response_text
+                event, only_final, full_response_text, token_tracker
             )
-
-            # Accumulate actual response content for token counting
-            if yield_value is not None and not yield_value.startswith("（......）"):
-                actual_response_text += yield_value
 
             if yield_value is not None:
                 yield Ok(yield_value)
 
             if is_final and not final_response_yielded:
                 try:
-                    # Calculate actual output tokens from response
-                    actual_output_tokens = count_tokens(actual_response_text)
+                    # Get comprehensive token summary
+                    token_summary = token_tracker.get_summary()
 
+                    # Store both input and total token usage in history
                     broker_client.add_message_history(
                         model=model,
                         text=query,
-                        tokens=query_tokens,
+                        tokens=token_summary["total_tokens"],  # Store total tokens instead of just input
                         interval_seconds=interval_seconds,
                         timestamp=time.time(),
                     )
 
-                    # Log token usage for debugging
-                    logger.info(
-                        f"Token usage - Input: {query_tokens}, Output: {actual_output_tokens}"
-                    )
+                    # Log comprehensive token usage
+                    logger.info(f"Comprehensive token usage:")
+                    logger.info(f"  Input tokens: {token_summary['input_tokens']}")
+                    logger.info(f"  Output tokens: {token_summary['output_tokens']}")
+                    logger.info(f"  Function call tokens: {token_summary['function_call_tokens']}")
+                    logger.info(f"  Function response tokens: {token_summary['function_response_tokens']}")
+                    logger.info(f"  Reasoning tokens: {token_summary['reasoning_tokens']}")
+                    logger.info(f"  Total tokens: {token_summary['total_tokens']}")
 
                 except Exception as e:
                     logger.warning(f"Failed to add broker history: {e}")
