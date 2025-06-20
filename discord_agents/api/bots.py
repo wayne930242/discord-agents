@@ -171,14 +171,7 @@ async def update_agent(
     current_user: str = Depends(get_current_user),
 ) -> Agent:
     """Update an agent"""
-    db_agent = db.query(AgentModel).filter(AgentModel.id == agent_id).first()
+    db_agent = AgentService.update_agent(db, agent_id, agent_update)
     if not db_agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-
-    update_data = agent_update.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_agent, field, value)
-
-    db.commit()
-    db.refresh(db_agent)
     return Agent.model_validate(db_agent)

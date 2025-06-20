@@ -36,6 +36,8 @@ const botFormSchema = z.object({
   command_prefix: z.string().min(1, "指令前綴不能為空"),
   error_message: z.string(),
   agent_id: z.string().optional(),
+  dm_whitelist: z.string().optional(),
+  srv_whitelist: z.string().optional(),
 });
 
 type BotFormValues = z.infer<typeof botFormSchema>;
@@ -64,6 +66,8 @@ export function BotEditDialog({
       command_prefix: "!",
       error_message: "",
       agent_id: "none",
+      dm_whitelist: "",
+      srv_whitelist: "",
     },
   });
 
@@ -75,6 +79,8 @@ export function BotEditDialog({
         command_prefix: bot.command_prefix,
         error_message: bot.error_message,
         agent_id: bot.agent_id?.toString() || "none",
+        dm_whitelist: bot.dm_whitelist?.join(", ") || "",
+        srv_whitelist: bot.srv_whitelist?.join(", ") || "",
       });
     }
   }, [bot, form]);
@@ -99,6 +105,12 @@ export function BotEditDialog({
         data.agent_id && data.agent_id !== "none"
           ? Number(data.agent_id)
           : undefined,
+      dm_whitelist: data.dm_whitelist
+        ? data.dm_whitelist.split(",").map(id => id.trim()).filter(id => id)
+        : [],
+      srv_whitelist: data.srv_whitelist
+        ? data.srv_whitelist.split(",").map(id => id.trim()).filter(id => id)
+        : [],
     };
 
     await updateBotMutation.mutateAsync({ id: bot.id, data: updateData });
@@ -108,7 +120,7 @@ export function BotEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>編輯機器人 #{bot.id}</DialogTitle>
           <DialogDescription>修改機器人的配置設定</DialogDescription>
@@ -202,6 +214,40 @@ export function BotEditDialog({
                       </Button>
                     )}
                   </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="dm_whitelist"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>DM 白名單</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Discord 用戶 ID，用逗號分隔（例如：123456789, 987654321）"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="srv_whitelist"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>伺服器白名單</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Discord 伺服器 ID，用逗號分隔（例如：123456789, 987654321）"
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
