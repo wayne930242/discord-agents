@@ -1,10 +1,8 @@
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
-from datetime import datetime
 from typing import Optional, Union, List
 from enum import Enum
-import pytz
 
 from discord_agents.domain.tools import Tools
 from discord_agents.utils.logger import get_logger
@@ -248,7 +246,7 @@ class MyAgent:
             "The actual user message follows after the [/USER_INFO] section.\n\n"
         )
 
-        self.instructions = f"{user_info_instructions}{role_instructions}\n\n{tool_instructions}\n\n{MyAgent.get_time_instructions()}"
+        self.instructions = f"{user_info_instructions}{role_instructions}\n\n{tool_instructions}"
 
         logger.info(f"Initializing agent '{name}' with tools input: {tools}")
         logger.info(f"Tools input type: {type(tools)}")
@@ -310,10 +308,3 @@ class MyAgent:
             self.instructions,
             "\n".join(self.tool_names),
         )
-
-    @staticmethod
-    def get_time_instructions() -> str:
-        timezone = pytz.timezone("Asia/Taipei")
-        current_time = datetime.now(timezone)
-        time_instructions = f"The current time is {current_time.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Taipei)."
-        return time_instructions

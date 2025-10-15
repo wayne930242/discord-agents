@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import re
 from result import Result, Ok, Err
+from datetime import datetime
+import pytz
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.runners import Runner
@@ -270,6 +272,12 @@ class AgentCog(commands.Cog):
             return Err("Failed to get user_adk_id")
         return Ok((query, user_id_result))
 
+    def _get_current_time_info(self) -> str:
+        """Get current time with timezone information."""
+        timezone = pytz.timezone("Asia/Taipei")
+        current_time = datetime.now(timezone)
+        return f"[CURRENT_TIME]\n{current_time.strftime('%Y-%m-%d %H:%M:%S')} (Asia/Taipei, UTC+8)\n[/CURRENT_TIME]\n\n"
+
     def _format_user_info(self, message: discord.Message) -> str:
         """Format user information for the agent context."""
         user_info_parts = []
@@ -332,9 +340,10 @@ class AgentCog(commands.Cog):
             await message.channel.send(self.ERROR_MESSAGE)
             return
 
-        # Format user info and prepend to query
+        # Format time info, user info and prepend to query
+        time_info = self._get_current_time_info()
         user_info = self._format_user_info(message)
-        enhanced_query = user_info + query
+        enhanced_query = time_info + user_info + query
 
         runner = Runner(
             app_name=self.APP_NAME,
