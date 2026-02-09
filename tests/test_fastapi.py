@@ -262,6 +262,59 @@ class TestFastAPIBots:
         assert "bot_1" in data
         assert data["bot_1"]["total_pending"] == 3
         assert data["bot_1"]["channels"]["12345"] == 2
+        assert data["bot_1"]["status"] == "running"
+
+    def test_get_bot_queue_metrics_with_filters(
+        self,
+        client: TestClient,
+        auth_headers: Dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test queue metrics filter params top_n_channels/include_idle_bots."""
+        auth_value = auth_headers["Authorization"].replace("Basic ", "")
+        decoded = base64.b64decode(auth_value).decode()
+        username, password = decoded.split(":")
+
+        def fake_queue_metrics() -> Dict[str, Dict[str, Any]]:
+            return {
+                "bot_1": {
+                    "total_pending": 6,
+                    "channels": {
+                        "c1": 3,
+                        "c2": 2,
+                        "c3": 1,
+                    },
+                    "updated_at": "2026-02-09T00:00:00+00:00",
+                }
+            }
+
+        class FakeRedisClient:
+            def get_all_bot_status(self) -> Dict[str, str]:
+                return {
+                    "bot_1": "running",
+                    "bot_2": "idle",
+                }
+
+        monkeypatch.setattr(
+            "discord_agents.api.bots.bot_manager.get_all_queue_metrics",
+            fake_queue_metrics,
+        )
+        monkeypatch.setattr(
+            "discord_agents.scheduler.broker.BotRedisClient",
+            lambda: FakeRedisClient(),
+        )
+
+        response = client.get(
+            "/api/v1/bots/queues?top_n_channels=2&include_idle_bots=true",
+            auth=(username, password),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["bot_1"]["channels"] == {"c1": 3, "c2": 2}
+        assert data["bot_1"]["status"] == "running"
+        assert data["bot_2"]["total_pending"] == 0
+        assert data["bot_2"]["channels"] == {}
+        assert data["bot_2"]["status"] == "idle"
 
     def test_get_bot_by_id(
         self,

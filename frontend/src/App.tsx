@@ -5,6 +5,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { BotManagement } from "./pages/BotManagement";
 import { AgentManagement } from "./pages/AgentManagement";
 import { UsageAnalytics } from "./pages/UsageAnalytics";
+import { QueueMonitor } from "./pages/QueueMonitor";
 import { Login } from "./pages/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Toaster } from "@/components/ui/toaster";
@@ -56,6 +57,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <UsageAnalytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/queues"
+              element={
+                <ProtectedRoute>
+                  <QueueMonitor />
                 </ProtectedRoute>
               }
             />

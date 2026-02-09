@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -29,7 +30,7 @@ import {
   type BotCreate,
   type Agent,
 } from "@/lib/api";
-import { getBotQueueView, useBotQueues } from "@/hooks/useBotQueues";
+import { getBotQueueView, useBotQueuesWithOptions } from "@/hooks/useBotQueues";
 import { BotQueueCell } from "@/components/BotQueueCell";
 import { BotEditDialog } from "@/components/BotEditDialog";
 import { AgentEditDialog } from "@/components/AgentEditDialog";
@@ -39,6 +40,7 @@ export function BotManagement() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingBot, setEditingBot] = useState<Bot | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [onlyHighLoad, setOnlyHighLoad] = useState(false);
   const [newBot, setNewBot] = useState<Partial<BotCreate>>({
     token: "",
     command_prefix: "!",
@@ -74,7 +76,11 @@ export function BotManagement() {
   });
 
   // Fetch per-bot per-channel queue metrics
-  const { data: botQueues = {} } = useBotQueues();
+  const { data: botQueues = {} } = useBotQueuesWithOptions({
+    topNChannels: 20,
+    includeIdleBots: true,
+    refetchIntervalMs: 3000,
+  });
 
   // Create bot mutation
   const createBotMutation = useMutation({
@@ -181,6 +187,10 @@ export function BotManagement() {
   const openBotEditor = (bot: Bot) => {
     setEditingBot(bot);
   };
+
+  const displayBots = onlyHighLoad
+    ? bots.filter((bot) => getBotQueueView(bot, botQueues).totalPending > 0)
+    : bots;
 
   if (isLoading) {
     return (
@@ -292,13 +302,23 @@ export function BotManagement() {
         <CardHeader>
           <CardTitle>機器人列表</CardTitle>
           <CardDescription>
-            目前配置的所有機器人 ({bots.length} 個)
+            目前配置的所有機器人 ({displayBots.length}/{bots.length} 個)
           </CardDescription>
+          <div className="flex items-center gap-2 text-sm">
+            <Switch
+              id="only-high-load"
+              checked={onlyHighLoad}
+              onCheckedChange={setOnlyHighLoad}
+            />
+            <Label htmlFor="only-high-load">只顯示有待處理 Queue 的機器人</Label>
+          </div>
         </CardHeader>
         <CardContent>
-          {bots.length === 0 ? (
+          {displayBots.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              還沒有任何機器人，點擊上方的「新增機器人」按鈕來創建第一個機器人。
+              {bots.length === 0
+                ? "還沒有任何機器人，點擊上方的「新增機器人」按鈕來創建第一個機器人。"
+                : "目前沒有符合篩選條件的機器人。"}
             </div>
           ) : (
             <Table>
@@ -314,7 +334,7 @@ export function BotManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bots.map((bot) => {
+                {displayBots.map((bot) => {
                   const queueView = getBotQueueView(bot, botQueues);
                   return (
                     <TableRow key={bot.id}>

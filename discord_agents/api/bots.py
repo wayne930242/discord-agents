@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from discord_agents.core.database import get_db
 from discord_agents.core.security import get_current_user
@@ -47,10 +47,57 @@ async def get_all_bot_status(
 
 @router.get("/queues")
 async def get_all_bot_queue_metrics(
+    top_n_channels: int = Query(
+        10, ge=1, le=1000, description="Max number of channels per bot to return"
+    ),
+    include_idle_bots: bool = Query(
+        False, description="Include bots not currently running in bot manager"
+    ),
     current_user: str = Depends(get_current_user),
 ) -> dict[str, dict[str, object]]:
     """Get pending queue metrics for each running bot and channel."""
-    return bot_manager.get_all_queue_metrics()
+    queue_metrics = bot_manager.get_all_queue_metrics()
+
+    # Trim channel details by pending desc and top_n limit.
+    result: dict[str, dict[str, Any]] = {}
+    for bot_id, metrics in queue_metrics.items():
+        channels = metrics.get("channels", {})
+        if not isinstance(channels, dict):
+            channels = {}
+
+        sorted_channels = sorted(
+            channels.items(),
+            key=lambda item: int(item[1]),
+            reverse=True,
+        )[:top_n_channels]
+
+        trimmed_channels = {
+            str(channel_id): int(pending) for channel_id, pending in sorted_channels
+        }
+        result[bot_id] = {
+            "total_pending": int(metrics.get("total_pending", 0)),
+            "channels": trimmed_channels,
+            "updated_at": metrics.get("updated_at"),
+            "status": "running",
+        }
+
+    if include_idle_bots:
+        from discord_agents.scheduler.broker import BotRedisClient
+
+        redis_client = BotRedisClient()
+        status_map = redis_client.get_all_bot_status()
+        for bot_id, status_value in status_map.items():
+            if bot_id not in result:
+                result[bot_id] = {
+                    "total_pending": 0,
+                    "channels": {},
+                    "updated_at": None,
+                    "status": status_value,
+                }
+            else:
+                result[bot_id]["status"] = status_value
+
+    return result
 
 
 @router.post("/start-all")

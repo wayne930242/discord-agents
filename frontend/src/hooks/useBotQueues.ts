@@ -29,9 +29,23 @@ export const getBotQueueView = (
 };
 
 export function useBotQueues() {
+  return useBotQueuesWithOptions();
+}
+
+export function useBotQueuesWithOptions(options?: {
+  topNChannels?: number;
+  includeIdleBots?: boolean;
+  refetchIntervalMs?: number;
+}) {
+  const topNChannels = options?.topNChannels ?? 10;
+  const includeIdleBots = options?.includeIdleBots ?? false;
   return useQuery({
-    queryKey: ["bot-queues"],
-    queryFn: botAPI.getBotQueues,
-    refetchInterval: 3000,
+    queryKey: ["bot-queues", topNChannels, includeIdleBots],
+    queryFn: () =>
+      botAPI.getBotQueues({
+        topNChannels,
+        includeIdleBots,
+      }),
+    refetchInterval: options?.refetchIntervalMs ?? 3000,
   });
 }

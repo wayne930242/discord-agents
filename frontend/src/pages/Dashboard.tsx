@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bot, Activity, LogOut, DollarSign, TrendingUp } from "lucide-react";
+import { Bot, Activity, LogOut, DollarSign, TrendingUp, ListOrdered } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { botAPI, authAPI, tokenUsageAPI, type Bot as BotType } from "@/lib/api";
@@ -169,6 +169,12 @@ export function Dashboard() {
               <Link to="/usage">
                 <TrendingUp className="h-4 w-4 mr-2" />
                 用量分析
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/queues">
+                <ListOrdered className="h-4 w-4 mr-2" />
+                Queue 監控
               </Link>
             </Button>
             <Button variant="outline" disabled>

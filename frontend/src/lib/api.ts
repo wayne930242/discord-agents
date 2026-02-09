@@ -142,7 +142,8 @@ export interface BotUpdate {
 export interface BotQueueMetrics {
   total_pending: number;
   channels: Record<string, number>;
-  updated_at: string;
+  updated_at: string | null;
+  status?: string;
 }
 
 export type BotQueueSnapshot = Record<string, BotQueueMetrics>;
@@ -290,8 +291,22 @@ export const botAPI = {
     return response.data;
   },
 
-  async getBotQueues(): Promise<BotQueueSnapshot> {
-    const response = await api.get("/bots/queues");
+  async getBotQueues(params?: {
+    topNChannels?: number;
+    includeIdleBots?: boolean;
+  }): Promise<BotQueueSnapshot> {
+    const queryParams = new URLSearchParams();
+    if (params?.topNChannels) {
+      queryParams.append("top_n_channels", params.topNChannels.toString());
+    }
+    if (params?.includeIdleBots) {
+      queryParams.append("include_idle_bots", "true");
+    }
+
+    const url = queryParams.toString()
+      ? `/bots/queues?${queryParams}`
+      : "/bots/queues";
+    const response = await api.get(url);
     return response.data;
   },
 };
