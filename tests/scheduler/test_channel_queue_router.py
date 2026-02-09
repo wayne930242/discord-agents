@@ -18,7 +18,7 @@ async def test_same_channel_messages_are_processed_in_order() -> None:
     await router.enqueue("channel-1", "a", handler)
     await router.enqueue("channel-1", "b", handler)
 
-    await asyncio.sleep(0.08)
+    await router.wait_channel_idle("channel-1")
     await router.close()
 
     assert processed == ["a", "b"]
@@ -55,3 +55,24 @@ async def test_different_channels_are_processed_concurrently() -> None:
     await router.close()
 
     assert elapsed < 0.22
+
+
+@pytest.mark.asyncio
+async def test_queue_full_raises_error() -> None:
+    router = ChannelQueueRouter(max_pending_per_channel=1)
+
+    started = asyncio.Event()
+    unblock = asyncio.Event()
+
+    async def handler(_: str) -> None:
+        started.set()
+        await unblock.wait()
+
+    await router.enqueue("channel-1", "a", handler)
+    await started.wait()
+    await router.enqueue("channel-1", "b", handler)
+    with pytest.raises(RuntimeError, match="Channel queue is full"):
+        await router.enqueue("channel-1", "c", handler)
+
+    unblock.set()
+    await router.close()
