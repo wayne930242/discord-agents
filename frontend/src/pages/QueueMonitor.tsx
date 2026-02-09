@@ -1,11 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useBotQueuesWithOptions } from "@/hooks/useBotQueues";
 
 export function QueueMonitor() {
+  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "idle">("all");
+  const [expandedBots, setExpandedBots] = useState<Record<string, boolean>>({});
+
   const { data: snapshot = {}, isLoading } = useBotQueuesWithOptions({
     includeIdleBots: true,
     topNChannels: 50,
@@ -27,6 +31,16 @@ export function QueueMonitor() {
   }, [snapshot]);
 
   const totalPending = rows.reduce((acc, row) => acc + row.totalPending, 0);
+  const filteredRows = rows.filter((row) => {
+    if (statusFilter === "all") {
+      return true;
+    }
+    return row.status === statusFilter;
+  });
+
+  const toggleExpand = (botId: string) => {
+    setExpandedBots((prev) => ({ ...prev, [botId]: !prev[botId] }));
+  };
 
   return (
     <Layout
@@ -39,13 +53,36 @@ export function QueueMonitor() {
         <CardHeader>
           <CardTitle>Queue 概覽</CardTitle>
           <CardDescription>
-            目前總待處理: {totalPending}，每 3 秒更新一次
+            目前總待處理: {totalPending}，每 3 秒更新一次（顯示 {filteredRows.length}/{rows.length} 個 Bot）
           </CardDescription>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={statusFilter === "all" ? "default" : "outline"}
+              onClick={() => setStatusFilter("all")}
+            >
+              全部
+            </Button>
+            <Button
+              size="sm"
+              variant={statusFilter === "running" ? "default" : "outline"}
+              onClick={() => setStatusFilter("running")}
+            >
+              running
+            </Button>
+            <Button
+              size="sm"
+              variant={statusFilter === "idle" ? "default" : "outline"}
+              onClick={() => setStatusFilter("idle")}
+            >
+              idle
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-muted-foreground">載入中...</div>
-          ) : rows.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div className="text-muted-foreground">尚無可監控的 Bot 佇列資料。</div>
           ) : (
             <Table>
@@ -59,7 +96,7 @@ export function QueueMonitor() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {filteredRows.map((row) => (
                   <TableRow key={row.botId}>
                     <TableCell className="font-medium">{row.botId}</TableCell>
                     <TableCell>
@@ -72,11 +109,23 @@ export function QueueMonitor() {
                       {row.channels.length === 0 ? (
                         <span className="text-muted-foreground">無</span>
                       ) : (
-                        row.channels.slice(0, 5).map((channel) => (
-                          <div key={channel.channelId}>
-                            #{channel.channelId}: {channel.pending}
-                          </div>
-                        ))
+                        <>
+                          {(expandedBots[row.botId] ? row.channels : row.channels.slice(0, 5)).map((channel) => (
+                            <div key={channel.channelId}>
+                              #{channel.channelId}: {channel.pending}
+                            </div>
+                          ))}
+                          {row.channels.length > 5 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1 mt-1 text-xs"
+                              onClick={() => toggleExpand(row.botId)}
+                            >
+                              {expandedBots[row.botId] ? "收合" : `展開全部 (${row.channels.length})`}
+                            </Button>
+                          )}
+                        </>
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
