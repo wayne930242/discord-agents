@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import re
+import asyncio
 from result import Result, Ok, Err
 from datetime import datetime
 import pytz
@@ -11,6 +12,7 @@ from typing import Optional
 from discord_agents.utils.call_agent import stream_agent_responses
 from discord_agents.utils.logger import get_logger
 from discord_agents.domain.agent import MyAgent
+from discord_agents.scheduler.channel_queue_router import ChannelQueueRouter
 
 
 logger = get_logger("base_cog")
@@ -44,6 +46,7 @@ class AgentCog(commands.Cog):
         logger.info(f"Session Service initialized for app: {app_name}")
         self.my_agent = my_agent
         logger.info(f"Agent initialized for app: {app_name}")
+        self._queue_router = ChannelQueueRouter()
 
         # Get agent ID from database for token usage tracking
         self.agent_id: Optional[int] = None
@@ -316,6 +319,14 @@ class AgentCog(commands.Cog):
 
     @commands.Cog.listener("on_message")
     async def _on_message(self, message: discord.Message) -> None:
+        if message.author.bot or not isinstance(
+            message.channel, (discord.DMChannel, discord.TextChannel)
+        ):
+            return
+        channel_id = str(message.channel.id)
+        await self._queue_router.enqueue(channel_id, message, self._process_message)
+
+    async def _process_message(self, message: discord.Message) -> None:
         result = self.parse_message_query(message)
         if result.is_err():
             return
@@ -357,6 +368,13 @@ class AgentCog(commands.Cog):
             logger.error(
                 f"process_agent_stream_responses failed: {stream_result.err()}"
             )
+
+    def cog_unload(self) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._queue_router.close())
 
     def check_clear_sessions_permission(
         self, ctx: commands.Context, target_user_id: Optional[str]

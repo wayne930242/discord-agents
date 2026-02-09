@@ -110,13 +110,19 @@ discord-agents/
 ## Coding Conventions for AI Assistants
 
 ### General Conventions
-- Use Python 3.13+ with type hints for all new backend code
+- Use Python 3.14 with type hints for all new backend code
 - Use TypeScript for all frontend code
 - Follow PEP 8 style guidelines for Python
 - Use ESLint and Prettier for frontend code formatting
 - Use meaningful variable and function names
 - Add docstrings for classes and complex functions
 - Use `Result[T, E]` pattern for error handling where appropriate
+
+### Python 3.14 與 free-threaded 說明
+- 專案目標 Python 版本為 3.14（`>=3.14,<3.15`）。
+- free-threaded（`--disable-gil`）建置僅用於相容性驗證，不是生產環境預設。
+- 一次性升級可參考：安裝並切換到 Python 3.14.2、重新 `uv sync`、再執行 `uv run python -m pytest tests/runtime/test_python_runtime_guard.py -v`。
+- `3.15-dev` 與 `3.14t` 僅作非阻斷相容追蹤，可透過 `./scripts/runtime_matrix.sh` 執行。
 
 ### Backend Import Organization
 ```python
@@ -276,15 +282,15 @@ export function BotList({ onBotSelect }: BotListProps) {
 ### Running Tests
 ```bash
 # Run all tests
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 
 # Run specific test categories
-python -m pytest tests/test_e2e.py -v          # End-to-end tests
-python -m pytest tests/test_tools.py -v        # Tool tests
-python -m pytest tests/test_content_extractor_tool.py -v  # Content extractor tests
+uv run python -m pytest tests/test_e2e.py -v          # End-to-end tests
+uv run python -m pytest tests/test_tools.py -v        # Tool tests
+uv run python -m pytest tests/test_content_extractor_tool.py -v  # Content extractor tests
 
 # Run with coverage
-python -m pytest tests/ --cov=discord_agents --cov-report=html
+uv run python -m pytest tests/ --cov=discord_agents --cov-report=html
 ```
 
 ### Frontend Testing

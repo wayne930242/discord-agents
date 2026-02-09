@@ -17,11 +17,31 @@ A modern Discord bot management system built with FastAPI + React architecture, 
 
 ## 📋 Prerequisites
 
-- Python 3.13 or higher
+- Python 3.14
 - PostgreSQL 15+
 - Redis 7+
 - Node.js 20+ and pnpm
 - uv (Python package manager)
+
+## 🐍 Python 3.14 目標與升級
+
+- 本專案目前目標執行版本為 Python 3.14（`>=3.14,<3.15`）。
+- free-threaded（`--disable-gil`）建置僅作為相容性驗證選項，並非正式生產預設。
+- 另提供 `3.15-dev` 與 `3.14t`（free-threaded）非阻斷驗證軌，用於觀察相依套件支援狀態。
+- 一次性升級指引（建議）：
+
+```bash
+pyenv install 3.14.2
+pyenv local 3.14.2
+uv sync
+uv run python -m pytest tests/runtime/test_python_runtime_guard.py -v
+```
+
+可使用矩陣腳本一次執行穩定版與非阻斷驗證：
+
+```bash
+./scripts/runtime_matrix.sh
+```
 
 ## 🛠️ Installation
 
@@ -203,14 +223,14 @@ The system includes the following built-in tools:
 
 ```bash
 # Run all tests
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 
 # Run specific tests
-python -m pytest tests/test_e2e.py -v          # End-to-end tests
-python -m pytest tests/test_tools.py -v        # Tool tests
+uv run python -m pytest tests/test_e2e.py -v          # End-to-end tests
+uv run python -m pytest tests/test_tools.py -v        # Tool tests
 
 # Run tests with coverage report
-python -m pytest tests/ --cov=discord_agents --cov-report=html
+uv run python -m pytest tests/ --cov=discord_agents --cov-report=html
 ```
 
 ### Test Prerequisites
