@@ -227,6 +227,42 @@ class TestFastAPIBots:
         data = response.json()
         assert isinstance(data, list)
 
+    def test_get_bot_queue_metrics(
+        self,
+        client: TestClient,
+        auth_headers: Dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test getting bot queue metrics snapshot"""
+        # Extract credentials from auth headers
+        auth_value = auth_headers["Authorization"].replace("Basic ", "")
+        decoded = base64.b64decode(auth_value).decode()
+        username, password = decoded.split(":")
+
+        def fake_queue_metrics() -> Dict[str, Dict[str, Any]]:
+            return {
+                "bot_1": {
+                    "total_pending": 3,
+                    "channels": {
+                        "12345": 2,
+                        "67890": 1,
+                    },
+                    "updated_at": "2026-02-09T00:00:00+00:00",
+                }
+            }
+
+        monkeypatch.setattr(
+            "discord_agents.api.bots.bot_manager.get_all_queue_metrics",
+            fake_queue_metrics,
+        )
+
+        response = client.get("/api/v1/bots/queues", auth=(username, password))
+        assert response.status_code == 200
+        data = response.json()
+        assert "bot_1" in data
+        assert data["bot_1"]["total_pending"] == 3
+        assert data["bot_1"]["channels"]["12345"] == 2
+
     def test_get_bot_by_id(
         self,
         client: TestClient,

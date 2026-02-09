@@ -198,3 +198,9 @@ class MyBot:
         if not self._cog:
             raise ValueError("Cog is not initialized")
         return self._cog.my_agent
+
+    def get_queue_pending_counts(self) -> dict[str, int]:
+        """Return per-channel pending queue counts for this bot."""
+        if not self._cog:
+            return {}
+        return self._cog.get_queue_pending_counts()

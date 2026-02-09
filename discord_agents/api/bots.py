@@ -13,6 +13,7 @@ from discord_agents.schemas.bot import (
     AgentUpdate,
 )
 from discord_agents.services.bot_service import BotService, AgentService
+from discord_agents.scheduler.worker import bot_manager
 
 router = APIRouter()
 
@@ -42,6 +43,14 @@ async def get_all_bot_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get bot status: {str(e)}",
         )
+
+
+@router.get("/queues")
+async def get_all_bot_queue_metrics(
+    current_user: str = Depends(get_current_user),
+) -> dict[str, dict[str, object]]:
+    """Get pending queue metrics for each running bot and channel."""
+    return bot_manager.get_all_queue_metrics()
 
 
 @router.post("/start-all")

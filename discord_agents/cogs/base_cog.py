@@ -545,3 +545,7 @@ class AgentCog(commands.Cog):
                 db.close()
         except Exception as e:
             logger.error(f"Failed to record token usage: {e}", exc_info=True)
+
+    def get_queue_pending_counts(self) -> dict[str, int]:
+        """Expose per-channel queue pending counts for monitoring APIs."""
+        return self._queue_router.pending_counts()

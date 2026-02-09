@@ -1,5 +1,6 @@
 import time
 import threading
+from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
 from discord_agents.domain.bot import MyBotInitConfig, MyAgentSetupConfig, MyBot
 from discord_agents.utils.logger import get_logger
@@ -90,6 +91,18 @@ class BotManager:
 
     def all_bots(self) -> List[str]:
         return list(self._bot_map.keys())
+
+    def get_all_queue_metrics(self) -> dict[str, dict[str, object]]:
+        """Return queue metrics for all active bot instances."""
+        metrics: dict[str, dict[str, object]] = {}
+        for bot_id, my_bot in self._bot_map.items():
+            channel_pending = my_bot.get_queue_pending_counts()
+            metrics[bot_id] = {
+                "total_pending": sum(channel_pending.values()),
+                "channels": channel_pending,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        return metrics
 
     def start(self) -> None:
         if self._monitor_thread and self._monitor_thread.is_alive():

@@ -139,6 +139,14 @@ export interface BotUpdate {
   agent_id?: number;
 }
 
+export interface BotQueueMetrics {
+  total_pending: number;
+  channels: Record<string, number>;
+  updated_at: string;
+}
+
+export type BotQueueSnapshot = Record<string, BotQueueMetrics>;
+
 // Token Usage Types
 export interface TokenUsage {
   id: number;
@@ -279,6 +287,11 @@ export const botAPI = {
 
   async getBotStatus(): Promise<Record<string, string>> {
     const response = await api.get("/bots/status");
+    return response.data;
+  },
+
+  async getBotQueues(): Promise<BotQueueSnapshot> {
+    const response = await api.get("/bots/queues");
     return response.data;
   },
 };

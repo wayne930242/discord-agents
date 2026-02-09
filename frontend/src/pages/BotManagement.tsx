@@ -29,6 +29,8 @@ import {
   type BotCreate,
   type Agent,
 } from "@/lib/api";
+import { getBotQueueView, useBotQueues } from "@/hooks/useBotQueues";
+import { BotQueueCell } from "@/components/BotQueueCell";
 import { BotEditDialog } from "@/components/BotEditDialog";
 import { AgentEditDialog } from "@/components/AgentEditDialog";
 import { Layout } from "@/components/Layout";
@@ -71,12 +73,16 @@ export function BotManagement() {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
+  // Fetch per-bot per-channel queue metrics
+  const { data: botQueues = {} } = useBotQueues();
+
   // Create bot mutation
   const createBotMutation = useMutation({
     mutationFn: botAPI.createBot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] });
       queryClient.invalidateQueries({ queryKey: ["bot-status"] });
+      queryClient.invalidateQueries({ queryKey: ["bot-queues"] });
       setShowCreateForm(false);
       setNewBot({
         token: "",
@@ -95,6 +101,7 @@ export function BotManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] });
       queryClient.invalidateQueries({ queryKey: ["bot-status"] });
+      queryClient.invalidateQueries({ queryKey: ["bot-queues"] });
     },
   });
 
@@ -104,6 +111,7 @@ export function BotManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] });
       queryClient.invalidateQueries({ queryKey: ["bot-status"] });
+      queryClient.invalidateQueries({ queryKey: ["bot-queues"] });
     },
   });
 
@@ -113,6 +121,7 @@ export function BotManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bots"] });
       queryClient.invalidateQueries({ queryKey: ["bot-status"] });
+      queryClient.invalidateQueries({ queryKey: ["bot-queues"] });
     },
   });
 
@@ -299,17 +308,21 @@ export function BotManagement() {
                   <TableHead>狀態</TableHead>
                   <TableHead>指令前綴</TableHead>
                   <TableHead>代理人</TableHead>
+                  <TableHead>Queue</TableHead>
                   <TableHead>Token</TableHead>
                   <TableHead>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bots.map((bot) => (
-                  <TableRow key={bot.id}>
+                {bots.map((bot) => {
+                  const queueView = getBotQueueView(bot, botQueues);
+                  return (
+                    <TableRow key={bot.id}>
                     <TableCell className="font-medium">#{bot.id}</TableCell>
                     <TableCell>{getStatusBadge(bot)}</TableCell>
                     <TableCell>{bot.command_prefix}</TableCell>
                     <TableCell>{bot.agent?.name || "無"}</TableCell>
+                    <TableCell><BotQueueCell queueView={queueView} /></TableCell>
                     <TableCell className="font-mono text-sm">
                       {bot.token.substring(0, 20)}...
                     </TableCell>
@@ -348,8 +361,9 @@ export function BotManagement() {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
-                ))}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
