@@ -1,0 +1,1339 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: wayne930242/discord-agents
+    source: https://github.com/wayne930242/discord-agents
+    branch: main
+    commit: "3402bae1"
+    scope: [discord_agents/cogs/base_cog.py, discord_agents/core/config.py, discord_agents/domain/agent.py, discord_agents/domain/bot.py,
+      discord_agents/domain/tool_def/content_extractor_tool.py, discord_agents/domain/tool_def/life_env_tool.py, discord_agents/domain/tool_def/math_tool.py,
+      discord_agents/domain/tool_def/search_tool.py, discord_agents/domain/tool_def/summarizer_tool.py, discord_agents/domain/tools.py,
+      discord_agents/utils/logger.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:46:50Z'
+    url: https://a2as.org/certified/agents/wayne930242/discord-agents
+  signatures:
+    digest: sha256:vpdk3ZbNIyjjMPIIrX7BzzgilebOfSNl028CSBmk56E
+    key: ed25519:MJgjpnZL1_DKeHtE6OwtdV1w_D49Wxmwx3CmncuypXE
+    sig: ed25519:6KHW1sDlS_35qV-EtmiU_VgOCXk4Ftszp_bqJvQBEf78s6aoxxmP3S7ztGf6iGrET09k2e6CXO1z_JV1DNKVAw
+
+agents:
+  content_extractor_agent:
+    type: instance
+    models: [gemini-2.0-flash-lite]
+    tools: [extract_content_tool]
+    params:
+      name: content_extractor
+      description: A specialized agent that extracts and analyzes content from web pages using Crawl4AI.
+      instruction: [You are a web content analysis specialist., 'When given a URL, use the extract_content_from_url tool to
+          fetch and analyze its content.', 'After extracting content:', '1. Report the page title and basic metadata (word
+          count, if content was truncated).', 2. List the main headers to provide an overview of the page structure., 3. Highlight
+          key information found in the content that's most relevant to the user's request., 4. Note if there were any errors
+          during extraction., 'When extracting content from multiple URLs, organize the information clearly by URL.', 'If
+          the extraction fails, explain the error and suggest possible solutions.']
+      function: create_content_extractor_agent
+  life_env_agent:
+    type: instance
+    models: [gemini-2.0-flash-lite]
+    tools: [dice_tool_fn]
+    params:
+      name: life_env_agent
+      description: A life env creator using dice tool.
+      function: create_life_env_agent
+  math_agent:
+    type: instance
+    models: [gemini-2.0-flash-lite]
+    tools: [calculator]
+    params:
+      name: math_agent
+      description: A math expert that can solve math problems using Python expressions.
+      instruction: ['You are a math expert. Please convert the user''s math problem into a Python math expression, and use
+          the calculator tool to calculate the answer. Please give the calculation process and the final answer directly,
+          without guessing. If the user''s question is not a math problem, please return ''I''m sorry, I can only solve math
+          problems.''']
+      function: create_math_agent
+  my_agent:
+    type: instance
+    models: [self._agent_model]
+    tools: [self.tools]
+    params:
+      name: self.name
+      description: self.description
+      instruction: self.instructions
+      class: MyAgent
+  search_agent:
+    type: instance
+    models: [gemini-2.0-flash-lite]
+    tools: [adk_tavily_tool]
+    params:
+      name: search_agent
+      description: A search expert using Tavily Search API.
+      function: create_search_agent
+  summarizer_agent:
+    type: instance
+    models: [gemini-2.0-flash-lite]
+    tools: [summarize_tool]
+    params:
+      name: summarizer
+      description: A specialized agent that summarizes content at various detail levels.
+      function: create_summarizer_agent
+
+models:
+  gemini-2.0-flash-lite:
+    type: literal
+    agents: [math_agent, life_env_agent, summarizer_agent, content_extractor_agent, search_agent]
+  self._agent_model:
+    type: literal
+    agents: [my_agent]
+
+tools:
+  adk_tavily_tool:
+    type: function
+    agents: [search_agent]
+  calculator:
+    type: function
+    agents: [math_agent]
+    params:
+      description: |-
+        Use numexpr to calculate the math expression.
+        The input should be a single line of math expression.
+        For example: "37593 * 67" or "37593**(1/5)"
+
+        Args:
+            expression (str): The math expression to calculate.
+
+        Returns:
+            str: The result of the math expression.
+  content_extractor_tool:
+    type: agent
+    agents: [content_extractor_agent]
+    params:
+      wrapper: AgentTool
+      agent: content_extractor_agent
+  dice_tool_fn:
+    type: function
+    agents: [life_env_agent]
+  extract_content_tool:
+    type: function
+    agents: [content_extractor_agent]
+  life_env_tool:
+    type: agent
+    agents: [life_env_agent]
+    params:
+      wrapper: AgentTool
+      agent: life_env_agent
+  math_tool:
+    type: agent
+    agents: [math_agent]
+    params:
+      wrapper: AgentTool
+      agent: math_agent
+  search_tool:
+    type: agent
+    agents: [search_agent]
+    params:
+      wrapper: AgentTool
+      agent: search_agent
+  self.tools:
+    type: function
+    agents: [my_agent]
+    params:
+      dynamic: "True"
+  summarize_tool:
+    type: function
+    agents: [summarizer_agent]
+  summarizer_tool:
+    type: agent
+    agents: [summarizer_agent]
+    params:
+      wrapper: AgentTool
+      agent: summarizer_agent
+
+imports:
+  admin: discord_agents.api.admin
+  Agent: google.adk.Agent
+  AgentCog: discord_agents.cogs.base_cog.AgentCog
+  AgentCreate: discord_agents.schemas.bot.AgentCreate
+  AgentModel: discord_agents.models.bot.AgentModel
+  AgentService: discord_agents.services.bot_service.AgentService
+  AgentTool: google.adk.tools.agent_tool.AgentTool
+  AgentUpdate: discord_agents.schemas.bot.AgentUpdate
+  and_: sqlalchemy.and_
+  Any: typing.Any
+  APIRouter: fastapi.APIRouter
+  asynccontextmanager: contextlib.asynccontextmanager
+  AsyncGenerator: typing.AsyncGenerator
+  asyncio: asyncio
+  AsyncWebCrawler: crawl4ai.AsyncWebCrawler
+  auth: discord_agents.api.auth
+  auto_migrate: discord_agents.core.migration.auto_migrate
+  Awaitable: typing.Awaitable
+  Base: discord_agents.core.database.Base
+  BaseSettings: pydantic_settings.BaseSettings
+  BaseTool: google.adk.tools.base_tool.BaseTool
+  Bot: discord_agents.schemas.bot.Bot
+  bot_manager: discord_agents.scheduler.worker.bot_manager
+  BotCreate: discord_agents.schemas.bot.BotCreate
+  BotModel: discord_agents.models.bot.BotModel
+  BotRedisClient: discord_agents.scheduler.broker.BotRedisClient
+  bots: discord_agents.api.bots
+  BotService: discord_agents.services.bot_service.BotService
+  BotUpdate: discord_agents.schemas.bot.BotUpdate
+  Callable: typing.Callable
+  ChannelQueueRouter: discord_agents.scheduler.channel_queue_router.ChannelQueueRouter
+  Column: sqlalchemy.Column
+  commands: discord.ext.commands
+  content_extractor_tool: discord_agents.domain.tool_def.content_extractor_tool.content_extractor_tool
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  count_tokens: discord_agents.utils.call_agent.count_tokens
+  create_engine: sqlalchemy.create_engine
+  DatabaseSessionService: google.adk.sessions.DatabaseSessionService
+  dataclass: dataclasses.dataclass
+  date: datetime.date
+  DateTime: sqlalchemy.DateTime
+  datetime: datetime.datetime
+  DECIMAL: sqlalchemy.DECIMAL
+  Decimal: decimal.Decimal
+  DeclarativeBase: sqlalchemy.orm.DeclarativeBase
+  Depends: fastapi.Depends
+  Dict: typing.Dict
+  discord: discord
+  engine: discord_agents.core.database.engine
+  Enum: enum.Enum
+  Err: result.Err
+  Event: google.adk.events.Event
+  extras: psycopg2.extras
+  FastAPI: fastapi.FastAPI
+  FileResponse: fastapi.responses.FileResponse
+  ForeignKey: sqlalchemy.ForeignKey
+  func: sqlalchemy.func
+  FunctionTool: google.adk.tools.FunctionTool
+  Generator: typing.Generator
+  Generic: typing.Generic
+  get_current_user: discord_agents.core.security.get_current_user
+  get_db: discord_agents.core.database.get_db
+  get_logger: discord_agents.utils.logger.get_logger
+  get_note_broker_service: discord_agents.scheduler.note_broker_service.get_note_broker_service
+  health: discord_agents.api.health
+  HTTPException: fastapi.HTTPException
+  Index: sqlalchemy.Index
+  Integer: sqlalchemy.Integer
+  JSON: sqlalchemy.JSON
+  json: json
+  LangchainTool: google.adk.tools.langchain_tool.LangchainTool
+  life_env_tool: discord_agents.domain.tool_def.life_env_tool.life_env_tool
+  List: typing.List
+  LiteLlm: google.adk.models.lite_llm.LiteLlm
+  Literal: typing.Literal
+  LLMs: discord_agents.domain.agent.LLMs
+  load_dotenv: dotenv.load_dotenv
+  logging: logging
+  Mapped: sqlalchemy.orm.Mapped
+  mapped_column: sqlalchemy.orm.mapped_column
+  math: math
+  math_tool: discord_agents.domain.tool_def.math_tool.math_tool
+  ModelPricing: discord_agents.schemas.token_usage.ModelPricing
+  ModelPricingList: discord_agents.schemas.token_usage.ModelPricingList
+  MonthlyUsageTrend: discord_agents.schemas.token_usage.MonthlyUsageTrend
+  MyAgent: discord_agents.domain.agent.MyAgent
+  MyAgentSetupConfig: discord_agents.domain.bot_config.MyAgentSetupConfig
+  MyBot: discord_agents.domain.bot.MyBot
+  MyBotInitConfig: discord_agents.domain.bot_config.MyBotInitConfig
+  note_tool: discord_agents.domain.tool_def.note_tool.note_tool
+  note_wrapper_tool: discord_agents.domain.tool_def.note_wrapper_tool.note_wrapper_tool
+  NoteTool: discord_agents.domain.tool_def.note_tool.NoteTool
+  numexpr: numexpr
+  Ok: result.Ok
+  Optional: typing.Optional
+  os: os
+  parse: urllib.parse
+  psycopg2: psycopg2
+  pytz: pytz
+  Query: fastapi.Query
+  random: random
+  re: re
+  Redis: redis.Redis
+  Redlock: redlock.Redlock
+  relationship: sqlalchemy.orm.relationship
+  Request: fastapi.Request
+  Response: fastapi.responses.Response
+  Result: result.Result
+  rpg_dice_tool: discord_agents.domain.tool_def.rpg_dice_tool.rpg_dice_tool
+  Runner: google.adk.runners.Runner
+  sa: sqlalchemy
+  search_tool: discord_agents.domain.tool_def.search_tool.search_tool
+  Session: sqlalchemy.orm.Session
+  SessionLocal: discord_agents.core.database.SessionLocal
+  sessionmaker: sqlalchemy.orm.sessionmaker
+  settings: discord_agents.core.config.settings
+  setup_custom_logging: discord_agents.utils.logger.setup_custom_logging
+  StaticFiles: fastapi.staticfiles.StaticFiles
+  status: fastapi.status
+  stream_agent_responses: discord_agents.utils.call_agent.stream_agent_responses
+  String: sqlalchemy.String
+  summarizer_tool: discord_agents.domain.tool_def.summarizer_tool.summarizer_tool
+  sys: sys
+  TavilySearchResults: langchain_community.tools.TavilySearchResults
+  Text: sqlalchemy.Text
+  tiktoken: tiktoken
+  time: time
+  token_usage: discord_agents.api.token_usage
+  TokenUsage: discord_agents.schemas.token_usage.TokenUsage
+  TokenUsageCreate: discord_agents.schemas.token_usage.TokenUsageCreate
+  TokenUsageModel: discord_agents.models.bot.TokenUsageModel
+  TokenUsageService: discord_agents.services.token_usage_service.TokenUsageService
+  TokenUsageSummaryByAgent: discord_agents.schemas.token_usage.TokenUsageSummaryByAgent
+  TokenUsageSummaryByModel: discord_agents.schemas.token_usage.TokenUsageSummaryByModel
+  ToolContext: google.adk.tools.ToolContext
+  Tools: discord_agents.domain.tools.Tools
+  TotalCostSummary: discord_agents.schemas.token_usage.TotalCostSummary
+  Tuple: typing.Tuple
+  Type: typing.Type
+  TYPE_CHECKING: typing.TYPE_CHECKING
+  TypedDict: typing.TypedDict
+  types: google.genai.types
+  TypeVar: typing.TypeVar
+  Union: typing.Union
+  uvicorn: uvicorn
+
+functions:
+  __init__:
+    type: sync
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self, max_pending_per_channel]
+    params:
+      returns: None
+  __new__:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [cls]
+    params:
+      returns: BotRedisClient
+  __repr__:
+    type: sync
+    module: discord_agents.models.bot
+    args: [self]
+    params:
+      returns: str
+  _acquire_lock:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, lock_key, expire_ms]
+    params:
+      returns: Any
+  _create_note_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, title, content, tags]
+    params:
+      returns: Dict
+  _delete_note_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, note_id]
+    params:
+      returns: Dict
+  _delete_notes_by_session:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id]
+    params:
+      returns: int
+  _ensure_queue:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self, channel_id]
+    params:
+      returns: asyncio.Queue[QueueItem[object]]
+  _ensure_session:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, user_adk_id]
+    params:
+      returns: Result
+  _execute_sql:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, query, params]
+    params:
+      returns: List[Dict]
+  _extract_content_from_url:
+    type: async
+    module: discord_agents.domain.tool_def.content_extractor_tool
+    args: [url, include_headers]
+    params:
+      returns: Dict
+  _format_user_info:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self, message]
+    params:
+      returns: str
+  _get_current_time_info:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self]
+    params:
+      returns: str
+  _get_db_config:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self]
+    params:
+      returns: Dict
+  _get_history_and_prompt:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [broker_client, model, query, max_tokens]
+    params:
+      returns: Result
+  _get_key:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id]
+    params:
+      returns: str
+  _get_note_broker:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    params:
+      returns: Any
+  _get_note_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, note_id]
+    params:
+      returns: Dict
+  _get_user_adk_id:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self, message]
+    params:
+      returns: Result
+  _handle_event:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [event, only_final, full_response_text, token_tracker]
+    params:
+      returns: tuple
+  _init_bot:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, command_prefix, intents]
+    params:
+      returns: commands.Bot
+  _init_command_prefix:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, command_prefix_param]
+    params:
+      returns: str
+  _init_dm_whitelist:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, dm_whitelist]
+    params:
+      returns: list[str]
+  _init_intents:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: discord.Intents
+  _init_srv_whitelist:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, srv_whitelist]
+    params:
+      returns: list[str]
+  _initialize_toolbox:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self]
+    params:
+      returns: None
+  _list_notes_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id]
+    params:
+      returns: List[Dict]
+  _load_agent_info:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self]
+    params:
+      returns: None
+  _on_message:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, message]
+    params:
+      returns: None
+  _on_ready:
+    type: async
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: Result
+  _process_message:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, message]
+    params:
+      returns: None
+  _record_token_usage:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self, input_tokens, output_tokens]
+    params:
+      returns: None
+  _search_notes_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, query]
+    params:
+      returns: List[Dict]
+  _update_note_direct:
+    type: sync
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, note_id, title, content, tags]
+    params:
+      returns: Dict
+  _validate_token:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, token]
+    params:
+      returns: Result
+  _worker_loop:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self, channel_id]
+    params:
+      returns: None
+  add_function_call_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self, tokens]
+    params:
+      returns: None
+  add_function_response_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self, tokens]
+    params:
+      returns: None
+  add_input_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self, tokens]
+    params:
+      returns: None
+  add_message_history:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, model, text, tokens, interval_seconds, timestamp]
+    params:
+      returns: None
+  add_output_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self, tokens]
+    params:
+      returns: None
+  add_reasoning_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self, tokens]
+    params:
+      returns: None
+  add_session_note_id:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [note_id, session_id]
+    params:
+      returns: None
+  bot_id:
+    type: sync
+    module: discord_agents.models.bot
+    args: [self]
+    params:
+      returns: str
+  calculator:
+    type: sync
+    module: discord_agents.domain.tool_def.math_tool
+    args: [expression]
+    params:
+      returns: str
+  call:
+    type: async
+    module: discord_agents.domain.tool_def.note_tool
+    args: [self, session_id, action]
+    params:
+      returns: str
+  call_agent_async:
+    type: async
+    module: discord_agents.utils.call_agent
+    args: [query, runner, user_id, session_id]
+    params:
+      returns: str
+  check_clear_sessions_permission:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self, ctx, target_user_id]
+    params:
+      returns: bool
+  clear:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id]
+    params:
+      returns: bool
+  clear_all:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self]
+    params:
+      returns: int
+  clear_config:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: None
+  clear_session_data:
+    type: sync
+    module: discord_agents.scheduler.note_broker_service
+    args: [self, session_id]
+    params:
+      returns: bool
+  clear_sessions:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, ctx, target_user_id]
+    params:
+      returns: None
+  close:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self]
+    params:
+      returns: None
+  cog_unload:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self]
+    params:
+      returns: None
+  count_function_call_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [function_call]
+    params:
+      returns: int
+  count_function_response_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [function_response]
+    params:
+      returns: int
+  count_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [text]
+    params:
+      returns: int
+  create_agent:
+    type: async
+    module: discord_agents.api.bots
+    args: [agent, db, current_user]
+    params:
+      returns: Agent
+  create_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot, db, current_user]
+    params:
+      returns: Bot
+  create_content_extractor_agent:
+    type: sync
+    module: discord_agents.domain.tool_def.content_extractor_tool
+    params:
+      returns: Agent
+  create_life_env_agent:
+    type: sync
+    module: discord_agents.domain.tool_def.life_env_tool
+    params:
+      returns: Agent
+  create_math_agent:
+    type: sync
+    module: discord_agents.domain.tool_def.math_tool
+    params:
+      returns: Agent
+  create_search_agent:
+    type: sync
+    module: discord_agents.domain.tool_def.search_tool
+    params:
+      returns: Agent
+  create_summarizer_agent:
+    type: sync
+    module: discord_agents.domain.tool_def.summarizer_tool
+    params:
+      returns: Agent
+  delete_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot_id, db, current_user]
+    params:
+      returns: dict
+  dice_tool:
+    type: sync
+    module: discord_agents.domain.tool_def.rpg_dice_tool
+    args: [dice_count, dice_sides]
+    params:
+      returns: Dict
+  dm_id_white_list_parsed:
+    type: sync
+    module: discord_agents.core.config
+    args: [self]
+    params:
+      returns: list[str]
+  enqueue:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self, channel_id, payload, handler]
+    params:
+      returns: None
+  extract_content_from_url:
+    type: async
+    module: discord_agents.domain.tool_def.content_extractor_tool
+    args: [url, include_headers]
+    params:
+      returns: Dict
+  find_model_type:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [model_name]
+    params:
+      returns: Optional[LLM_TYPE]
+  format:
+    type: sync
+    module: discord_agents.utils.logger
+    args: [self, record]
+    params:
+      returns: str
+  gemini_model:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [self]
+    params:
+      returns: str
+  get:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id]
+    params:
+      returns: Optional[T]
+  get_agent:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [self]
+    params:
+      returns: Agent
+  get_agent_usage:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [agent_id, year, month, db, current_user]
+    params:
+      returns: List[TokenUsage]
+  get_agents:
+    type: async
+    module: discord_agents.api.bots
+    args: [db, current_user]
+    params:
+      returns: List[Agent]
+  get_all_bot_queue_metrics:
+    type: async
+    module: discord_agents.api.bots
+    args: [top_n_channels, include_idle_bots, current_user]
+    params:
+      returns: dict
+  get_all_bot_status:
+    type: async
+    module: discord_agents.api.bots
+    args: [current_user]
+    params:
+      returns: dict
+  get_all_bots:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self]
+    params:
+      returns: list[str]
+  get_all_running_bots:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self]
+    params:
+      returns: list[str]
+  get_all_usage:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [year, month, db, current_user]
+    params:
+      returns: List[TokenUsage]
+  get_available_tools:
+    type: async
+    module: discord_agents.api.bots
+    args: [current_user]
+    params:
+      returns: dict
+  get_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot_id, db, current_user]
+    params:
+      returns: Bot
+  get_bots:
+    type: async
+    module: discord_agents.api.bots
+    args: [db, current_user]
+    params:
+      returns: List[Bot]
+  get_db:
+    type: sync
+    module: discord_agents.core.database
+    params:
+      returns: Generator
+  get_info:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [self]
+    params:
+      returns: tuple
+  get_init_config:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: Optional[MyBotInitConfig]
+  get_logger:
+    type: sync
+    module: discord_agents.utils.logger
+    args: [name]
+    params:
+      returns: logging.Logger
+  get_message_history:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, model]
+    params:
+      returns: list[dict]
+  get_model_names:
+    type: sync
+    module: discord_agents.domain.agent
+    params:
+      returns: List[str]
+  get_model_pricing:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [current_user]
+    params:
+      returns: ModelPricingList
+  get_model_pricing_detail:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [model_name, current_user]
+    params:
+      returns: ModelPricing
+  get_models_below_price:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [max_input_price, max_output_price]
+    params:
+      returns: List[str]
+  get_monthly_usage_trend:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [agent_id, model_name, limit, db, current_user]
+    params:
+      returns: List[MonthlyUsageTrend]
+  get_my_agent:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: MyAgent
+  get_note_broker_service:
+    type: sync
+    module: discord_agents.scheduler.note_broker_service
+    params:
+      returns: NoteBrokerService
+  get_pricing:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [model_name]
+    params:
+      returns: tuple
+  get_queue_pending_counts:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: dict
+  get_restrictions:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [model_name]
+    params:
+      returns: tuple
+  get_session_data:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [key, default, session_id]
+    params:
+      returns: Any
+  get_session_note_ids:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [session_id]
+    params:
+      returns: list[str]
+  get_setup_config:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: Optional[MyAgentSetupConfig]
+  get_state:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: str
+  get_summary:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self]
+    params:
+      returns: dict
+  get_tool:
+    type: sync
+    module: discord_agents.domain.tools
+    args: [cls, name]
+    params:
+      returns: BaseTool
+  get_tool_names:
+    type: sync
+    module: discord_agents.domain.tools
+    args: [cls]
+    params:
+      returns: list[str]
+  get_tools:
+    type: sync
+    module: discord_agents.domain.tools
+    args: [cls, names]
+    params:
+      returns: list[BaseTool]
+  get_total_cost:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [agent_id, year, month, db, current_user]
+    params:
+      returns: TotalCostSummary
+  get_total_tokens:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [self]
+    params:
+      returns: int
+  get_usage_summary_by_agent:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [year, month, db, current_user]
+    params:
+      returns: List[TokenUsageSummaryByAgent]
+  get_usage_summary_by_model:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [year, month, db, current_user]
+    params:
+      returns: List[TokenUsageSummaryByModel]
+  has:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id]
+    params:
+      returns: bool
+  help_command:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, ctx]
+    params:
+      returns: None
+  info_command:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, ctx]
+    params:
+      returns: None
+  lifespan:
+    type: async
+    module: discord_agents.fastapi_main
+    args: [app]
+    params:
+      returns: AsyncGenerator
+  lite_model:
+    type: sync
+    module: discord_agents.domain.agent
+    args: [self]
+    params:
+      returns: LiteLlm
+  lock_and_set_starting_if_should_start:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id, expire_ms]
+    params:
+      returns: bool
+  lock_and_set_stopping_if_should_stop:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id, expire_ms]
+    params:
+      returns: Literal
+  notes_function:
+    type: async
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [action, title, content, note_id, tags, query, tool_context]
+    params:
+      returns: str
+  on_ready:
+    type: async
+    module: discord_agents.domain.bot
+    params:
+      returns: None
+  parse_message_query:
+    type: sync
+    module: discord_agents.cogs.base_cog
+    args: [self, message]
+    params:
+      returns: Result
+  pending_counts:
+    type: sync
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self]
+    params:
+      returns: dict
+  process_agent_stream_responses:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [self, message, runner, query, user_adk_id, session_id]
+    params:
+      returns: Result
+  prune_message_history:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, model]
+    params:
+      returns: None
+  record_token_usage:
+    type: async
+    module: discord_agents.api.token_usage
+    args: [usage, db, current_user]
+    params:
+      returns: TokenUsage
+  remove_session_note_id:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [note_id, session_id]
+    params:
+      returns: bool
+  reset_all_bots_status:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self]
+    params:
+      returns: None
+  run:
+    type: async
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: Result
+  send_chunks:
+    type: async
+    module: discord_agents.cogs.base_cog
+    args: [content]
+    params:
+      returns: None
+  serve_spa:
+    type: async
+    module: discord_agents.fastapi_main
+    args: [request, full_path]
+    params:
+      returns: Response
+  server_id_white_list_parsed:
+    type: sync
+    module: discord_agents.core.config
+    args: [self]
+    params:
+      returns: list[str]
+  set:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id, value, expire_seconds]
+    params:
+      returns: None
+  set_expiration:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, session_id, expire_seconds]
+    params:
+      returns: bool
+  set_idle:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: None
+  set_running:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: None
+  set_session_data:
+    type: sync
+    module: discord_agents.domain.tool_def.note_wrapper_tool
+    args: [key, value, session_id]
+    params:
+      returns: None
+  set_should_restart:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: None
+  set_should_start:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id, init_config, setup_config]
+    params:
+      returns: None
+  set_should_stop:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id]
+    params:
+      returns: None
+  set_state:
+    type: sync
+    module: discord_agents.scheduler.broker
+    args: [self, bot_id, state]
+    params:
+      returns: None
+  setup_custom_logging:
+    type: sync
+    module: discord_agents.utils.logger
+    params:
+      returns: None
+  setup_my_agent:
+    type: sync
+    module: discord_agents.domain.bot
+    args: [self, config]
+    params:
+      returns: Result
+  start_all_bots:
+    type: async
+    module: discord_agents.api.bots
+    args: [db, current_user]
+    params:
+      returns: dict
+  start_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot_id, db, current_user]
+    params:
+      returns: dict
+  stop:
+    type: async
+    module: discord_agents.domain.bot
+    args: [self]
+    params:
+      returns: Result
+  stop_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot_id, db, current_user]
+    params:
+      returns: dict
+  stream_agent_responses:
+    type: async
+    module: discord_agents.utils.call_agent
+    args: [query, runner, user_id, session_id, only_final, model, max_tokens, interval_seconds]
+    params:
+      returns: AsyncGenerator
+  summarize_content:
+    type: sync
+    module: discord_agents.domain.tool_def.summarizer_tool
+    args: [content, summary_length]
+    params:
+      returns: str
+  to_bot:
+    type: sync
+    module: discord_agents.models.bot
+    args: [self]
+    params:
+      returns: MyBot
+  to_init_config:
+    type: sync
+    module: discord_agents.models.bot
+    args: [self]
+    params:
+      returns: MyBotInitConfig
+  to_setup_agent_config:
+    type: sync
+    module: discord_agents.models.bot
+    args: [self]
+    params:
+      returns: MyAgentSetupConfig
+  trim_history:
+    type: sync
+    module: discord_agents.utils.call_agent
+    args: [messages, max_tokens, model]
+    params:
+      returns: tuple
+  update_agent:
+    type: async
+    module: discord_agents.api.bots
+    args: [agent_id, agent_update, db, current_user]
+    params:
+      returns: Agent
+  update_bot:
+    type: async
+    module: discord_agents.api.bots
+    args: [bot_id, bot_update, db, current_user]
+    params:
+      returns: Bot
+  wait_all_idle:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self]
+    params:
+      returns: None
+  wait_channel_idle:
+    type: async
+    module: discord_agents.scheduler.channel_queue_router
+    args: [self, channel_id]
+    params:
+      returns: None
+
+variables:
+  ADMIN_PASSWORD:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  ADMIN_USERNAME:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  AGENT_MODEL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  DATABASE_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  DM_ID_WHITE_LIST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  DOCKER_CONTAINER:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [discord_agents.domain.tool_def.content_extractor_tool]
+  GOOGLE_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  LOG_LEVEL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.utils.logger]
+  OPENAI_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.fastapi_main]
+  REDIS_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  SECRET_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  SERVER_ID_WHITE_LIST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  TAVILY_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+  XAI_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [discord_agents.core.config]
+
+files:
+  /.dockerenv:
+    type: literal
+    actions: [read]
+    params:
+      caller: [_extract_content_from_url]
+  discord_agents.log:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [log_dir, discord_agents.log]
+  index.html:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [static_dir, index.html]
+  static_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists]
+  tools.yaml:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), data, tools.yaml]
